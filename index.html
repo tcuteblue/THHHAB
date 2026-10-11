@@ -82,7 +82,7 @@
     /* 🌟 重構 Header 佈局 (Grid 網格，絕對防重疊) */
     .app-header {
       background-color: #34A853; color: white;
-      padding: 8px 0; /* 🟢 調整：從原本 15px 縮小為 8px，高度減少約 1/4 */
+      padding: 8px 0; 
       position: sticky; top: 0; z-index: 1000; box-shadow: 0 2px 5px rgba(0,0,0,0.1);
       width: 100%; transition: background-color 0.3s;
       display: grid;
@@ -216,7 +216,12 @@
     
     <!-- ✏️ 新增帳目與系統設定頁面 -->
     <div id="addView" class="view-section active">
-      <label style="margin-top:0;">📅 日期</label>
+      
+      <!-- 🌟 時區切換功能 -->
+      <div style="display: flex; justify-content: space-between; align-items: center;">
+        <label style="margin-top: 0;">📅 日期</label>
+        <span id="tzToggleBtn" style="font-size: 14px; cursor: pointer; font-weight: bold; background: #E8F5E9; color: #2E7D32; padding: 6px 12px; border-radius: 15px;" onclick="toggleTimezone()">🌍 台灣時區 (鎖定)</span>
+      </div>
       <input type="date" id="dateInput">
       
       <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 15px;">
@@ -238,7 +243,7 @@
       
       <button onclick="submitData()">新增帳目</button>
 
-      <!-- 🌟 同步與備份區塊 (移至新增頁) -->
+      <!-- 同步與備份區塊 -->
       <hr style="border: 0; height: 1px; background: #ddd; margin: 40px 0 20px 0;">
       
       <div style="background: #f8f9fa; padding: 15px; border-radius: 12px; border: 1px solid #eee;">
@@ -277,14 +282,12 @@
     <div id="searchView" class="view-section">
       <label style="margin-top: 0;">🔍 萬用搜尋 (長按：多選加總 / 點擊：編輯)</label>
       <input type="text" id="searchInput" placeholder="搜尋日期、品名或金額..." oninput="filterLocalData()">
-      
-      <!-- 列表顯示區 (高度放大) -->
       <div class="result-box" id="resultBox"></div>
     </div> 
 
     <!-- 📊 圖表分析 -->
     <div id="chartView" class="view-section">
-      <label style="margin-top: 0;">📊 選擇分析月份 (依本地快取)</label>
+      <label style="margin-top: 0;">📊 選擇分析維度 (依本地快取)</label>
       <select id="chartMonthSelect" onchange="renderChart()"></select>
       
       <div class="chart-container">
@@ -382,7 +385,45 @@
   </div>
 
   <script>
-    document.getElementById('dateInput').valueAsDate = new Date();
+    // 🌟 初始化時區與日期設定
+    function initTimezone() {
+      const useTW = localStorage.getItem('useTaiwanTime') !== 'false'; // 預設為 true
+      updateTzUI(useTW);
+      document.getElementById('dateInput').value = getTodayDateString(useTW);
+    }
+    
+    function toggleTimezone() {
+      let useTW = localStorage.getItem('useTaiwanTime') !== 'false';
+      useTW = !useTW;
+      localStorage.setItem('useTaiwanTime', useTW);
+      updateTzUI(useTW);
+      document.getElementById('dateInput').value = getTodayDateString(useTW);
+    }
+    
+    function updateTzUI(useTW) {
+      const btn = document.getElementById('tzToggleBtn');
+      if (useTW) {
+        btn.innerHTML = "🌍 台灣時區 (鎖定)";
+        btn.style.color = "#2E7D32"; btn.style.background = "#E8F5E9";
+      } else {
+        btn.innerHTML = "📱 設備當地時間";
+        btn.style.color = "#E65100"; btn.style.background = "#FFF3E0";
+      }
+    }
+    
+    function getTodayDateString(useTW) {
+      let now = new Date();
+      if (useTW) {
+        // 強制轉換為 UTC+8 (台灣時區)
+        const utc = now.getTime() + (now.getTimezoneOffset() * 60000);
+        now = new Date(utc + (3600000 * 8));
+      }
+      const yyyy = now.getFullYear();
+      const mm = String(now.getMonth() + 1).padStart(2, '0');
+      const dd = String(now.getDate()).padStart(2, '0');
+      return `${yyyy}-${mm}-${dd}`;
+    }
+
     // ⚠ 請確認這是你最新部署的 GAS API URL
     const apiUrl = "https://script.google.com/macros/s/AKfycbxvVEOlqWPu-MraLhOcOp2OkAX0zD5tOLJFwlbHkqtWQAu9MRBh4I3ek4U9yn0jfevl/exec";
     let localLedgerData = [];
@@ -426,71 +467,43 @@
     });
 
     // ======== 🌟 長按多選加總 (核心邏輯) ========
-    let pressTimer = null;
-    let isLongPress = false;
-    let multiSelectMode = false;
-    let selectedItemsMap = new Map(); // 記錄 uniqueKey -> amount
+    let pressTimer = null; let isLongPress = false; let multiSelectMode = false; let selectedItemsMap = new Map(); 
 
     function startPress(e, domId, uniqueKey, amount) {
       isLongPress = false;
       pressTimer = setTimeout(() => {
-        isLongPress = true;
-        if (navigator.vibrate) navigator.vibrate(50); // 手機震動回饋
-        if (!multiSelectMode) {
-          multiSelectMode = true;
-          document.getElementById('multiSelectBar').style.display = 'flex';
-        }
+        isLongPress = true; if (navigator.vibrate) navigator.vibrate(50); 
+        if (!multiSelectMode) { multiSelectMode = true; document.getElementById('multiSelectBar').style.display = 'flex'; }
         toggleSelection(domId, uniqueKey, amount);
-      }, 500); // 0.5 秒觸發
+      }, 500); 
     }
-
-    function endPress(e) {
-      if (pressTimer) { clearTimeout(pressTimer); pressTimer = null; }
-    }
-
+    function endPress(e) { if (pressTimer) { clearTimeout(pressTimer); pressTimer = null; } }
     function itemClick(e, domId, uniqueKey, itemStr) {
       if (isLongPress) return; 
-      
       if (multiSelectMode) {
         const amt = parseFloat(JSON.parse(decodeURIComponent(itemStr)).amount.toString().replace(/,/g, '')) || 0;
         toggleSelection(domId, uniqueKey, amt);
-      } else {
-        openEditModal(itemStr);
-      }
+      } else { openEditModal(itemStr); }
     }
-
     function toggleSelection(domId, uniqueKey, amount) {
       const el = document.getElementById(domId);
       if (selectedItemsMap.has(uniqueKey)) {
         selectedItemsMap.delete(uniqueKey);
-        if (el) {
-          el.style.backgroundColor = "";
-          el.style.borderLeft = "4px solid #34C759";
-        }
+        if (el) { el.style.backgroundColor = ""; el.style.borderLeft = "4px solid #34C759"; }
       } else {
         selectedItemsMap.set(uniqueKey, amount);
-        if (el) {
-          el.style.backgroundColor = "#E3F2FD";
-          el.style.borderLeft = "6px solid #007AFF";
-        }
+        if (el) { el.style.backgroundColor = "#E3F2FD"; el.style.borderLeft = "6px solid #007AFF"; }
       }
       updateSumBar();
     }
-
     function updateSumBar() {
-      let sum = 0;
-      selectedItemsMap.forEach(amount => sum += amount);
+      let sum = 0; selectedItemsMap.forEach(amount => sum += amount);
       document.getElementById('selectCount').innerText = selectedItemsMap.size;
       document.getElementById('selectSum').innerText = sum.toLocaleString();
     }
-
     function exitMultiSelect() {
-      multiSelectMode = false;
-      selectedItemsMap.clear();
-      document.getElementById('multiSelectBar').style.display = 'none';
-      filterLocalData(); 
+      multiSelectMode = false; selectedItemsMap.clear(); document.getElementById('multiSelectBar').style.display = 'none'; filterLocalData(); 
     }
-
 
     // ======== 設定面板邏輯 ========
     let currentEditMode = ''; let tempEditingItems = []; 
@@ -498,8 +511,7 @@
     const defaultTags = "早餐,午餐,晚餐";
 
     function openSettingsModal(mode) {
-      currentEditMode = mode; document.getElementById('settingsModal').style.display = 'flex';
-      document.getElementById('modalNewInput').value = ''; 
+      currentEditMode = mode; document.getElementById('settingsModal').style.display = 'flex'; document.getElementById('modalNewInput').value = ''; 
       if (mode === 'categories') { 
         document.getElementById('modalTitle').innerText = "🏷️ 管理記帳分類"; 
         tempEditingItems = (localStorage.getItem(getStoreKey('myCustomCategories')) || defaultCategories).split(',').filter(t=>t.trim()!==''); 
@@ -511,51 +523,35 @@
     }
     
     function closeSettingsModal() { document.getElementById('settingsModal').style.display = 'none'; }
-    
     function renderModalList() {
       let html = tempEditingItems.length === 0 ? '<div style="text-align:center; color:#999; padding:10px;">(目前沒有項目)</div>' : '';
       tempEditingItems.forEach((item, i) => html += `<div class="modal-list-item"><span>${item}</span><span class="delete-btn" onclick="removeModalItem(${i})">❌</span></div>`);
       document.getElementById('modalList').innerHTML = html;
     }
-    
     function removeModalItem(i) { tempEditingItems.splice(i, 1); renderModalList(); }
-    
     function addModalItem() {
       const val = document.getElementById('modalNewInput').value.trim().replace(/,/g, '');
       if (val) { tempEditingItems.push(val); document.getElementById('modalNewInput').value = ''; renderModalList(); }
     }
-    
     function saveSettingsModal() {
       const finalStr = tempEditingItems.join(',');
-      if (currentEditMode === 'categories') { 
-        localStorage.setItem(getStoreKey('myCustomCategories'), finalStr); 
-        loadCategories(); 
-      } else { 
-        localStorage.setItem(getStoreKey('myCustomTags'), finalStr); 
-        loadQuickTags(); 
-      }
+      if (currentEditMode === 'categories') { localStorage.setItem(getStoreKey('myCustomCategories'), finalStr); loadCategories(); } 
+      else { localStorage.setItem(getStoreKey('myCustomTags'), finalStr); loadQuickTags(); }
       closeSettingsModal();
-      
-      // ✨ 儲存設定後，自動靜默下載一份備份檔到本機
       exportBackup({ silent: true });
     }
-    
     function loadCategories() {
       const categories = (localStorage.getItem(getStoreKey('myCustomCategories')) || defaultCategories).split(',').filter(t=>t.trim()!=='');
       const select = document.getElementById('categoryInput'); select.innerHTML = '';
       categories.forEach(cat => select.appendChild(new Option(cat, cat)));
     }
-    
     function loadQuickTags() {
       const tags = (localStorage.getItem(getStoreKey('myCustomTags')) || defaultTags).split(',').filter(t=>t.trim()!=='');
       document.getElementById('quickTagsContainer').innerHTML = tags.map(tag => `<span onclick="addQuickText('${tag} ')">✨ ${tag}</span>`).join('');
     }
-    
     function addQuickText(text) { document.getElementById('itemInput').value = text; document.getElementById('itemInput').focus(); }
-
     function updateDatalist() {
-      if (!localLedgerData) return;
-      const uniqueItems = new Set();
+      if (!localLedgerData) return; const uniqueItems = new Set();
       localLedgerData.forEach(item => {
         if (item.detail) {
           let cleanName = item.detail.trim().replace(/^(\d{2,3}\/)?\d{1,2}\/\d{1,2}\s*/, '').replace(/[\s\-$]*(NT\$?\vert{}\$)?\d+(?:\.\d+)?[元\s]*$/i, '').trim();
@@ -565,19 +561,18 @@
       document.getElementById('historySuggestions').innerHTML = Array.from(uniqueItems).map(v => `<option value="${v}">`).join('');
     }
 
-    // ======== 備份與還原 ========
+    // ======== 備份與還原 (加入時區設定) ========
     function exportBackup(options = {}) {
       const silent = options.silent === true;
-      if (!silent) {
-        if (!confirm(`確定要將目前的「${currentLedger === 'home' ? '家用雲帳本' : '工作室帳本'}」下載為備份檔嗎？`)) return false;
-      }
+      if (!silent && !confirm(`確定要將目前的「${currentLedger === 'home' ? '家用雲帳本' : '工作室帳本'}」下載為備份檔嗎？`)) return false;
 
       try {
         const backupData = {
           ledgerData: localStorage.getItem(getStoreKey('myLedgerData')) || '[]',
           syncInfo: localStorage.getItem(getStoreKey('myLedgerSyncInfo')) || '',
           customTags: localStorage.getItem(getStoreKey('myCustomTags')) || defaultTags,
-          customCategories: localStorage.getItem(getStoreKey('myCustomCategories')) || defaultCategories
+          customCategories: localStorage.getItem(getStoreKey('myCustomCategories')) || defaultCategories,
+          useTaiwanTime: localStorage.getItem('useTaiwanTime') || 'true' // 🌟 備份時區設定
         };
 
         const json = JSON.stringify(backupData);
@@ -602,13 +597,9 @@
     }
 
     function importBackup(event) {
-      const file = event.target.files[0];
-      if (!file) return;
-
+      const file = event.target.files[0]; if (!file) return;
       const ledgerName = currentLedger === 'home' ? '家用雲帳本' : '工作室帳本';
-      if (!confirm(`確定要匯入備份檔「${file.name}」嗎？\n\n⚠️ 警告：這將會完全覆蓋目前設備上的【${ledgerName}】資料與設定！`)) {
-        event.target.value = ''; return;
-      }
+      if (!confirm(`確定要匯入備份檔「${file.name}」嗎？\n\n⚠️ 警告：這將會完全覆蓋目前設備上的【${ledgerName}】資料與設定！`)) { event.target.value = ''; return; }
 
       const reader = new FileReader();
       reader.onload = function(e) {
@@ -619,6 +610,7 @@
             if (data.syncInfo) localStorage.setItem(getStoreKey('myLedgerSyncInfo'), data.syncInfo);
             if (data.customTags) localStorage.setItem(getStoreKey('myCustomTags'), data.customTags);
             if (data.customCategories) localStorage.setItem(getStoreKey('myCustomCategories'), data.customCategories);
+            if (data.useTaiwanTime !== undefined) localStorage.setItem('useTaiwanTime', data.useTaiwanTime); // 🌟 還原時區設定
 
             alert('✅ 備份資料已成功匯入！系統將重新載入以套用最新資料。');
             location.reload(); 
@@ -629,8 +621,9 @@
       reader.readAsText(file);
     }
 
-    // ======== 初始化與頁面切換 ========
+    // ======== 初始化 ========
     window.onload = function() {
+      initTimezone(); // 🌟 呼叫時區初始化
       const currentTwYear = new Date().getFullYear() - 1911;
       const currentMonth = (new Date().getMonth() + 1) + "月";
       const yearSelect = document.getElementById('syncYearSelect');
@@ -688,6 +681,8 @@
       .then(res => res.json()).then(res => {
         if (res.status === 'success') {
           alert("✅ 記帳成功！"); document.getElementById('itemInput').value = ''; document.getElementById('amountInput').value = '';
+          // 🌟 記帳完畢後，把日期自動重置為今天
+          document.getElementById('dateInput').value = getTodayDateString(localStorage.getItem('useTaiwanTime') !== 'false');
           document.getElementById('syncStatus').innerText = "⚠ 雲端有新帳目，建議同步更新";
         } else alert("❌ 錯誤：" + res.message);
       }).finally(() => document.getElementById('globalLoading').style.display = 'none');
@@ -728,9 +723,7 @@
         queue.forEach(q => {
           if (Array.isArray(q.month)) {
             q.month.forEach(m => finalData = finalData.filter(item => item.month !== (q.year + "年 " + m)));
-          } else {
-            finalData = finalData.filter(item => item.month !== (q.year + "年 " + q.month));
-          }
+          } else { finalData = finalData.filter(item => item.month !== (q.year + "年 " + q.month)); }
         });
       }
 
@@ -757,13 +750,11 @@
       loadLocalData(); 
       document.getElementById('globalLoading').style.display = 'none';
       document.getElementById('globalLoading').innerText = "⏳ 正在與雲端連線，請稍候...";
-      document.getElementById('syncStatus').innerText = localStorage.getItem(getStoreKey('myLedgerSyncInfo'));
     }
 
     function loadLocalData() {
       const storedData = localStorage.getItem(getStoreKey('myLedgerData'));
       const syncInfo = localStorage.getItem(getStoreKey('myLedgerSyncInfo'));
-      
       if (storedData && syncInfo) {
         localLedgerData = JSON.parse(storedData);
         document.getElementById('syncStatus').innerText = syncInfo; 
@@ -801,10 +792,8 @@
           const safeItemStr = encodeURIComponent(JSON.stringify(item)); 
           const domId = `result-item-${index}`;
           const amt = parseFloat(item.amount.toString().replace(/,/g, '')) || 0;
-          
           const uniqueKey = `${item.month}|${item.category}|${item.detail}|${item.amount}`;
           const isSelected = selectedItemsMap.has(uniqueKey);
-          
           const bgStyle = isSelected ? "background: #E3F2FD;" : "";
           const borderStyle = isSelected ? "border-left: 6px solid #007AFF;" : "border-left: 4px solid #34C759;";
 
@@ -832,7 +821,7 @@
     }
 
     // ======== ✏️ 編輯與刪除面板 ========
-    function openEditModal(itemStr) {
+    function openEditModal(itemStr) { /* ...維持原有不變... */ 
       const item = JSON.parse(decodeURIComponent(itemStr));
       document.getElementById('editMonth').value = item.month;
       document.getElementById('editOldCategory').value = item.category;
@@ -841,92 +830,107 @@
       document.getElementById('editMonthDisplay').innerText = `📍 ${item.month}`;
       document.getElementById('editDetailInput').value = item.detail;
       document.getElementById('editAmountInput').value = item.amount;
-
       const categories = (localStorage.getItem(getStoreKey('myCustomCategories')) || defaultCategories).split(',').filter(t=>t.trim()!=='');
       const select = document.getElementById('editCategoryInput'); select.innerHTML = '';
       categories.forEach(cat => select.appendChild(new Option(cat, cat)));
       select.value = item.category;
-
       document.getElementById('editModal').style.display = 'flex';
     }
-
     function closeEditModal() { document.getElementById('editModal').style.display = 'none'; }
-
-    function saveEditRecord() {
-      const data = {
-        action: 'edit', ledger: currentLedger, month: document.getElementById('editMonth').value,
-        oldCategory: document.getElementById('editOldCategory').value, oldDetail: document.getElementById('editOldDetail').value, oldAmount: document.getElementById('editOldAmount').value,
-        newCategory: document.getElementById('editCategoryInput').value, newDetail: document.getElementById('editDetailInput').value, newAmount: document.getElementById('editAmountInput').value
-      };
-
+    function saveEditRecord() { /* ...維持原有不變... */ 
+      const data = { action: 'edit', ledger: currentLedger, month: document.getElementById('editMonth').value, oldCategory: document.getElementById('editOldCategory').value, oldDetail: document.getElementById('editOldDetail').value, oldAmount: document.getElementById('editOldAmount').value, newCategory: document.getElementById('editCategoryInput').value, newDetail: document.getElementById('editDetailInput').value, newAmount: document.getElementById('editAmountInput').value };
       if (!data.newDetail || !data.newAmount) return alert("請完整填寫項目與金額！");
       if (data.oldCategory === data.newCategory && data.oldDetail === data.newDetail && data.oldAmount === data.newAmount) { closeEditModal(); return; }
-
-      document.getElementById('globalLoading').style.display = 'block';
-      document.getElementById('globalLoading').innerText = "⏳ 正在雲端儲存修改...";
-      closeEditModal();
-
-      fetch(apiUrl, { method: "POST", body: JSON.stringify(data) })
-      .then(res => res.json()).then(res => {
-        if (res.status === 'success') {
-          alert("✅ 修改成功！");
-          let idx = localLedgerData.findIndex(item => item.month === data.month && item.category === data.oldCategory && item.detail === data.oldDetail && item.amount === data.oldAmount);
-          if (idx !== -1) {
-            localLedgerData[idx].category = data.newCategory; localLedgerData[idx].detail = data.newDetail; localLedgerData[idx].amount = data.newAmount;
-            localStorage.setItem(getStoreKey('myLedgerData'), JSON.stringify(localLedgerData)); filterLocalData(); updateDatalist();
-          }
+      document.getElementById('globalLoading').style.display = 'block'; document.getElementById('globalLoading').innerText = "⏳ 正在雲端儲存修改..."; closeEditModal();
+      fetch(apiUrl, { method: "POST", body: JSON.stringify(data) }).then(res => res.json()).then(res => {
+        if (res.status === 'success') { alert("✅ 修改成功！"); let idx = localLedgerData.findIndex(item => item.month === data.month && item.category === data.oldCategory && item.detail === data.oldDetail && item.amount === data.oldAmount);
+          if (idx !== -1) { localLedgerData[idx].category = data.newCategory; localLedgerData[idx].detail = data.newDetail; localLedgerData[idx].amount = data.newAmount; localStorage.setItem(getStoreKey('myLedgerData'), JSON.stringify(localLedgerData)); filterLocalData(); updateDatalist(); }
         } else alert("❌ 修改失敗：" + res.message);
       }).finally(() => { document.getElementById('globalLoading').style.display = 'none'; });
     }
-
     function confirmDeleteFromEdit() {
       const month = document.getElementById('editMonth').value; const category = document.getElementById('editOldCategory').value;
       const detail = document.getElementById('editOldDetail').value; const amount = document.getElementById('editOldAmount').value;
       closeEditModal(); deleteRecord(month, category, detail, amount);
     }
-
-    function deleteRecord(month, category, detail, amount) {
+    function deleteRecord(month, category, detail, amount) { /* ...維持原有不變... */ 
       if (!confirm(`確定要刪除這筆紀錄嗎？\n\n📌 分類：${category}\n📝 項目：${detail}\n💰 金額：$${amount}`)) return;
-      document.getElementById('globalLoading').style.display = 'block';
-      document.getElementById('globalLoading').innerText = "⏳ 正在雲端刪除此筆資料...";
-      
+      document.getElementById('globalLoading').style.display = 'block'; document.getElementById('globalLoading').innerText = "⏳ 正在雲端刪除此筆資料...";
       fetch(apiUrl, { method: "POST", body: JSON.stringify({ action: 'delete', ledger: currentLedger, month, category, detail, amount }) })
       .then(res => res.json()).then(res => {
-        if (res.status === 'success') {
-          alert("✅ 刪除成功！");
-          localLedgerData = localLedgerData.filter(item => !(item.month === month && item.category === category && item.detail === detail && item.amount === amount));
+        if (res.status === 'success') { alert("✅ 刪除成功！"); localLedgerData = localLedgerData.filter(item => !(item.month === month && item.category === category && item.detail === detail && item.amount === amount));
           localStorage.setItem(getStoreKey('myLedgerData'), JSON.stringify(localLedgerData)); filterLocalData();
         } else alert("❌ 刪除失敗：" + res.message);
       }).finally(() => { document.getElementById('globalLoading').style.display = 'none'; });
     }
 
-    // ======== 📊 Chart.js 圖表邏輯 ========
+    // ======== 📊 圖表邏輯 (🌟 擴充為 半年/全年) ========
     function populateChartMonthSelect() {
       const currentTwYear = new Date().getFullYear() - 1911;
       const currentMonthLabel = currentTwYear + "年 " + (new Date().getMonth() + 1) + "月";
-      const months = new Set(localLedgerData.map(item => item.month)); months.add(currentMonthLabel); 
-      const select = document.getElementById('chartMonthSelect'); const currentVal = select.value || currentMonthLabel; 
       
+      const uniqueMonths = new Set(localLedgerData.map(item => item.month));
+      uniqueMonths.add(currentMonthLabel); 
+      
+      // 取出擁有的所有年份
+      const years = new Set();
+      uniqueMonths.forEach(m => {
+        const match = m.match(/(\d+)年/);
+        if (match) years.add(parseInt(match[1]));
+      });
+      const sortedYears = Array.from(years).sort((a, b) => b - a);
+      
+      const select = document.getElementById('chartMonthSelect');
+      const currentVal = select.value || currentMonthLabel; 
       select.innerHTML = '';
-      Array.from(months).sort((a, b) => {
-        const parseYM = str => { const m = str.match(/(\d+)年\s*(\d+)月/); return m ? parseInt(m[1]) * 100 + parseInt(m[2]) : 0; };
-        return parseYM(b) - parseYM(a);
-      }).forEach(m => select.appendChild(new Option(m, m)));
       
-      if(Array.from(months).includes(currentVal)) select.value = currentVal;
+      // 🌟 為每個年份建立 全年 / 半年 / 各月份 選項
+      sortedYears.forEach(y => {
+        select.appendChild(new Option(`${y}年 全年`, `${y}年 全年`));
+        select.appendChild(new Option(`${y}年 下半年 (7~12月)`, `${y}年 下半年`));
+        select.appendChild(new Option(`${y}年 上半年 (1~6月)`, `${y}年 上半年`));
+        
+        const monthsForYear = Array.from(uniqueMonths)
+          .filter(m => m.startsWith(y + "年 "))
+          .sort((a, b) => parseInt(b.match(/(\d+)月/)[1]) - parseInt(a.match(/(\d+)月/)[1]));
+          
+        monthsForYear.forEach(m => {
+          select.appendChild(new Option(`　└ ${m}`, m)); // 縮排設計，更有層次感
+        });
+      });
+      
+      if(Array.from(select.options).some(opt => opt.value === currentVal)) { select.value = currentVal; } 
+      else { select.value = currentMonthLabel; }
     }
 
     function renderChart() {
-      const selectedMonth = document.getElementById('chartMonthSelect').value; if(!selectedMonth) return;
+      const selected = document.getElementById('chartMonthSelect').value; if(!selected) return;
       const categoryTotals = {}; let totalAmount = 0;
       
-      localLedgerData.filter(item => item.month === selectedMonth).forEach(item => {
+      // 🌟 過濾資料：支援單月、半年、整年
+      let filteredData = [];
+      if (selected.includes('全年')) {
+        const y = selected.replace(' 全年', '');
+        filteredData = localLedgerData.filter(item => item.month.startsWith(y));
+      } else if (selected.includes('上半年')) {
+        const y = selected.replace(' 上半年', '');
+        const h1 = ['1月','2月','3月','4月','5月','6月'];
+        filteredData = localLedgerData.filter(item => item.month.startsWith(y) && h1.some(m => item.month.endsWith(" " + m)));
+      } else if (selected.includes('下半年')) {
+        const y = selected.replace(' 下半年', '');
+        const h2 = ['7月','8月','9月','10月','11月','12月'];
+        filteredData = localLedgerData.filter(item => item.month.startsWith(y) && h2.some(m => item.month.endsWith(" " + m)));
+      } else {
+        filteredData = localLedgerData.filter(item => item.month === selected); // 原本的單月
+      }
+      
+      filteredData.forEach(item => {
         let cat = item.category || "未分類"; let amt = parseFloat(item.amount.toString().replace(/,/g, '')) || 0;
         categoryTotals[cat] = (categoryTotals[cat] || 0) + amt; totalAmount += amt;
       });
 
       if (totalAmount === 0) {
-        document.getElementById('chartTotalInfo').innerText = "該月份尚無記帳資料 🌵";
+        document.getElementById('chartTotalInfo').innerText = "該區間尚無記帳資料 🌵";
         if (expenseChartInstance) { expenseChartInstance.destroy(); expenseChartInstance = null; }
         return; 
       }
@@ -944,25 +948,12 @@
 
     // ======== 🧮 計算機邏輯 ========
     let calcExpression = ''; let calcTargetInput = 'amountInput'; 
-
-    function openCalcModal(targetId = 'amountInput') {
-      calcTargetInput = targetId; document.getElementById('calcModal').style.display = 'flex';
-      calcExpression = document.getElementById(calcTargetInput).value || ''; updateCalcDisplay();
-    }
+    function openCalcModal(targetId = 'amountInput') { calcTargetInput = targetId; document.getElementById('calcModal').style.display = 'flex'; calcExpression = document.getElementById(calcTargetInput).value || ''; updateCalcDisplay(); }
     function closeCalcModal() { document.getElementById('calcModal').style.display = 'none'; }
     function calcInput(val) { if (calcExpression === '0' && val !== '.') calcExpression = ''; calcExpression += val; updateCalcDisplay(); }
     function calcClear() { calcExpression = ''; updateCalcDisplay(); }
-    function calcEval() {
-      try {
-        if (!calcExpression) return; if (!/^[\d+\-*/.]+$/.test(calcExpression)) throw new Error("無效字元");
-        const result = new Function('return ' + calcExpression)(); calcExpression = Math.round(result * 100) / 100 + ''; updateCalcDisplay();
-      } catch (e) { calcExpression = '錯誤'; updateCalcDisplay(); setTimeout(calcClear, 1000); }
-    }
-    function confirmCalc() {
-      if (/[+\-*/]/.test(calcExpression)) calcEval();
-      if (calcExpression !== '錯誤' && calcExpression !== '') document.getElementById(calcTargetInput).value = calcExpression;
-      closeCalcModal();
-    }
+    function calcEval() { try { if (!calcExpression) return; if (!/^[\d+\-*/.]+$/.test(calcExpression)) throw new Error("無效字元"); const result = new Function('return ' + calcExpression)(); calcExpression = Math.round(result * 100) / 100 + ''; updateCalcDisplay(); } catch (e) { calcExpression = '錯誤'; updateCalcDisplay(); setTimeout(calcClear, 1000); } }
+    function confirmCalc() { if (/[+\-*/]/.test(calcExpression)) calcEval(); if (calcExpression !== '錯誤' && calcExpression !== '') document.getElementById(calcTargetInput).value = calcExpression; closeCalcModal(); }
     function updateCalcDisplay() { document.getElementById('calcDisplay').innerText = calcExpression === '' ? '0' : calcExpression; }
   </script>
 </body>
