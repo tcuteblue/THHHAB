@@ -185,7 +185,7 @@
         </div>
         <button class="sync-btn" style="background: #34C759; margin-top: 10px;" onclick="syncData('custom')">⚙ 抓取指定月份</button>
         <button class="sync-btn" style="background: #FF9500; margin-top: 15px;" onclick="syncData('all')">🔄 歷年完整同步</button>
-        <div class="sync-status" id="syncStatus" style="font-size: 14px; margin-top: 15px; color: #888;">尚未同步資料</div>
+        <div class="sync-status" id="syncStatus" style="font-size: 18px; font-weight: bold; margin-top: 15px; color: #007AFF; text-align: center;">尚未同步資料</div>
       </div>
 
       <div style="background: #f8f9fa; padding: 15px; border-radius: 12px; border: 1px solid #eee; margin-top: 20px;">
@@ -444,7 +444,8 @@
 
     // ======== 執行同步與更新畫面 ========
     async function executeSyncQueue(queue, mode) {
-      document.getElementById('globalLoading').style.display = 'block';
+      // 🌟 移除了上方 globalLoading 的顯示，畫面不會再被上方文字干擾
+      
       const startTime = performance.now();
       let finalData = mode === 'all' ? [] : JSON.parse(localStorage.getItem(getStoreKey('myLedgerData')) || '[]');
       
@@ -462,10 +463,10 @@
         let q = queue[i];
         let monthLabel = Array.isArray(q.month) ? (q.month[0] === '1月' ? '上半年' : '下半年') : q.month;
         
-        // 🌟 這裡把被我刪掉的進度文字補回來了！同時更新頂部與底部狀態
-        let progressText = `⏳ 正在抓取 ${q.year}年 ${monthLabel} (${i + 1}/${queue.length})...`;
-        document.getElementById('globalLoading').innerText = progressText;
-        document.getElementById('syncStatus').innerText = progressText; 
+        // 🌟 只更新下方進度，並在「抓取中」把文字變成顯眼的橘色
+        let statusEl = document.getElementById('syncStatus');
+        statusEl.innerText = `⏳ 正在抓取 ${q.year}年 ${monthLabel} (${i + 1}/${queue.length})...`;
+        statusEl.style.color = "#FF9500"; 
         
         try {
           let res = await fetch(apiUrl, { method: "POST", body: JSON.stringify({ action: "sync_custom", targetYear: q.year, targetMonth: q.month, ledger: currentLedger }) });
@@ -479,18 +480,15 @@
 
       const duration = ((performance.now() - startTime) / 1000).toFixed(1);
       localStorage.setItem(getStoreKey('myLedgerData'), JSON.stringify(finalData));
-      localStorage.setItem(getStoreKey('myLedgerSyncInfo'), `上次同步時間：${new Date().toLocaleString()}\n(共 ${finalData.length} 筆資料，耗時 ${duration} 秒)`);
+      localStorage.setItem(getStoreKey('myLedgerSyncInfo'), `上次同步時間：${new Date().toLocaleString()}\n(共 ${finalData.length} 筆，耗時 ${duration} 秒)`);
       
       alert(`✅ 同步完成！\n共更新了 ${finalData.length} 筆資料。`);
       
-      // 🌟 結束後恢復初始狀態
-      document.getElementById('globalLoading').style.display = 'none';
-      document.getElementById('globalLoading').innerText = "⏳ 正在與雲端連線，請稍候...";
+      // 🌟 同步完成後，把底部文字顏色變回原本的藍色
+      document.getElementById('syncStatus').style.color = "#007AFF"; 
       
-      // 載入資料並更新底部時間
       loadLocalData(); 
     }
-
     function filterLocalData() {
       const keyword = document.getElementById('searchInput').value.trim().toLowerCase();
       // 🌟 過濾掉第二軌抓回來的系統彙總數據，維持清單乾淨
