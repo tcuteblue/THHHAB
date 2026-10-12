@@ -56,49 +56,46 @@
     .switch-btn:active { background: rgba(255, 255, 255, 0.4); }
 
     .card { background: white; width: 100%; max-width: 450px; padding: 25px; margin: 20px; border-radius: 16px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); box-sizing: border-box; }
-    
     .tabs { display: flex; margin-bottom: 20px; background: #eee; border-radius: 8px; overflow: hidden; }
     .tab { flex: 1; text-align: center; padding: 14px; cursor: pointer; font-weight: bold; color: #666; transition: 0.3s; font-size: 18px; }
     .tab.active { background: #007AFF; color: white; }
-    
     .view-section { display: none; }
     .view-section.active { display: block; }
 
     label { display: block; margin-top: 15px; font-weight: bold; color: #555; font-size: 18px; }
     input, select { width: 100%; padding: 14px; margin-top: 8px; border-radius: 8px; border: 1px solid #ddd; box-sizing: border-box; font-size: 20px; background: #fafafa; }
     input:focus, select:focus { outline: none; border-color: #007AFF; background: white; }
-    
     button { width: 100%; padding: 16px; background: #007AFF; color: white; border: none; border-radius: 8px; font-size: 20px; font-weight: bold; margin-top: 25px; cursor: pointer; transition: 0.2s; }
     button:active { transform: scale(0.98); }
     button.sync-btn { margin-top: 10px; font-size: 16px; padding: 12px; } 
 
-    #installAppBtn { background: #E8F5E9; color: #2E7D32; border: 2px solid #34A853; margin-top: 0; margin-bottom: 20px; display: none; }
+    #installAppBtn { background: #E8F5E9; color: #2E7D32; border: 2px solid #34A853; margin-top: 0; margin-bottom: 20px; display: none; animation: popIn 0.5s ease-out; }
+    @keyframes popIn { 0% { transform: scale(0.9); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
+
     .quick-tags { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin: 8px 0 12px 0; }
     .quick-tags span { background: #E8F5E9; color: #2E7D32; padding: 10px 4px; border-radius: 20px; font-size: 16px; font-weight: bold; cursor: pointer; border: 1px solid #C8E6C9; transition: 0.2s; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .quick-tags span:active { transform: scale(0.95); background: #C8E6C9; }
 
-    .global-loading { display: none; text-align: center; margin-bottom: 15px; font-weight: bold; color: #E02020; font-size: 16px; }
-
     .result-box { margin-top: 15px; max-height: 65vh; overflow-y: auto; padding-bottom: 80px; }
     .result-item { background: #f9f9f9; padding: 15px; border-radius: 8px; margin-bottom: 10px; border-left: 4px solid #34C759; font-size: 18px; transition: 0.1s; }
-    .result-item:active { transform: scale(0.98); background: #eef2f5; }
     .result-amount { font-weight: bold; color: #E02020; font-size: 22px; margin-top: 8px; }
     .result-category { font-size: 14px; color: white; background: #34A853; padding: 2px 8px; border-radius: 12px; margin-right: 8px; display: inline-block; }
     .result-month { font-size: 16px; color: #888; margin-bottom: 6px; }
     
-    .multi-select-bar { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: rgba(30, 30, 30, 0.95); backdrop-filter: blur(10px); color: white; padding: 15px 25px; border-radius: 30px; box-shadow: 0 8px 20px rgba(0,0,0,0.3); z-index: 2000; display: none; justify-content: space-between; align-items: center; width: 85%; max-width: 400px; font-size: 18px; }
+    .multi-select-bar { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: rgba(30, 30, 30, 0.95); backdrop-filter: blur(10px); color: white; padding: 15px 25px; border-radius: 30px; box-shadow: 0 8px 20px rgba(0,0,0,0.3); z-index: 2000; display: none; justify-content: space-between; align-items: center; width: 85%; max-width: 400px; animation: slideUp 0.3s ease-out; font-size: 18px; }
+    @keyframes slideUp { from { bottom: -50px; opacity: 0; } to { bottom: 20px; opacity: 1; } }
     .multi-select-bar button { margin: 0; padding: 8px 15px; font-size: 16px; background: rgba(255,255,255,0.2); width: auto; }
 
-    /* 圖表專屬控制樣式 */
+    /* 圖表專屬樣式 */
     .chart-mode-bar, .chart-type-bar { display: flex; background: #eee; border-radius: 8px; overflow: hidden; margin-bottom: 15px; }
     .btn-mode, .btn-type { flex: 1; text-align: center; padding: 10px; font-weight: bold; color: #666; cursor: pointer; font-size: 16px; transition: 0.2s; }
     .btn-mode.active { background: #555; color: white; }
     .btn-type.active { background: #007AFF; color: white; }
     .chart-container { margin-top: 10px; position: relative; height: 320px; width: 100%; }
-    
-    /* 計算機與設定 Modal */
+
+    /* Modal 樣式 */
     .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 3000; justify-content: center; align-items: center; backdrop-filter: blur(3px); }
-    .modal-card { background: white; width: 90%; max-width: 400px; border-radius: 16px; padding: 25px; box-sizing: border-box; box-shadow: 0 10px 25px rgba(0,0,0,0.1); }
+    .modal-card { background: white; width: 90%; max-width: 400px; border-radius: 16px; padding: 25px; box-sizing: border-box; box-shadow: 0 10px 25px rgba(0,0,0,0.1); animation: popIn 0.3s ease-out; }
     .modal-title { font-size: 22px; font-weight: bold; margin-bottom: 15px; color: #333; text-align: center; }
     .modal-list { max-height: 250px; overflow-y: auto; margin-bottom: 15px; background: #fafafa; border-radius: 8px; padding: 5px; }
     .modal-list-item { display: flex; justify-content: space-between; align-items: center; padding: 12px; border-bottom: 1px solid #eee; font-size: 18px; }
@@ -110,8 +107,9 @@
     .modal-actions button { margin-top: 0; flex: 1; padding: 14px; font-size: 18px; }
     .btn-cancel { background: #E0E0E0; color: #333; }
 
+    /* 計算機樣式 */
     .calc-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
-    .calc-btn { background: #f8f9fa; color: #333; font-size: 28px; font-weight: bold; padding: 16px 0; border: 1px solid #ddd; border-radius: 8px; cursor: pointer; margin-top: 0; }
+    .calc-btn { background: #f8f9fa; color: #333; font-size: 28px; font-weight: bold; padding: 16px 0; border: 1px solid #ddd; border-radius: 8px; cursor: pointer; transition: 0.1s; margin-top: 0; }
     .calc-btn:active { background: #e2e6ea; transform: scale(0.95); }
     .calc-op { background: #FFF3E0; color: #E65100; border-color: #FFE0B2; }
     .calc-clear { background: #FFEBEE; color: #C62828; border-color: #FFCDD2; }
@@ -135,9 +133,7 @@
       <div class="tab" onclick="switchTab('chart')">📊 圖表</div>
     </div>
     
-    <div class="global-loading" id="globalLoading">⏳ 正在與雲端連線，請稍候...</div>
-    
-    <!-- ✏️ 新增帳目頁面 -->
+    <!-- ✏️ 新增帳目與系統設定頁面 -->
     <div id="addView" class="view-section active">
       <div style="display: flex; justify-content: space-between; align-items: center;">
         <label style="margin-top: 0;">📅 日期</label>
@@ -185,6 +181,8 @@
         </div>
         <button class="sync-btn" style="background: #34C759; margin-top: 10px;" onclick="syncData('custom')">⚙ 抓取指定月份</button>
         <button class="sync-btn" style="background: #FF9500; margin-top: 15px;" onclick="syncData('all')">🔄 歷年完整同步</button>
+        
+        <!-- 🌟 放大的、無灰色、醒目的狀態列 -->
         <div class="sync-status" id="syncStatus" style="font-size: 18px; font-weight: bold; margin-top: 15px; color: #007AFF; text-align: center;">尚未同步資料</div>
       </div>
 
@@ -205,9 +203,8 @@
       <div class="result-box" id="resultBox"></div>
     </div> 
 
-    <!-- 📊 圖表分析 -->
+    <!-- 📊 圖表分析 (高級按鈕介面) -->
     <div id="chartView" class="view-section">
-      <!-- 圖表控制面板 -->
       <div class="chart-type-bar">
         <div id="btnType_category" class="btn-type active" onclick="setChartType('category')">支出分類佔比</div>
         <div id="btnType_balance" class="btn-type" onclick="setChartType('balance')">收支結餘趨勢</div>
@@ -236,6 +233,7 @@
     </div>
   </div>
 
+  <!-- 浮動列與 Modals -->
   <div class="multi-select-bar" id="multiSelectBar">
     <span>已選取: <b id="selectCount" style="color:#4BC0C0; font-size:20px;">0</b> 筆<br>總計: $ <b id="selectSum" style="color:#FFCE56; font-size:20px;">0</b></span>
     <button onclick="exitMultiSelect()">❌ 退出</button>
@@ -250,12 +248,9 @@
       <select id="editCategoryInput"></select>
       <label>📝 項目說明</label>
       <input type="text" id="editDetailInput">
-      <label>💰 金額</label>
+      <label>💰 金額 (元)</label>
       <input type="text" id="editAmountInput" readonly style="cursor: pointer; background: #F4F8FF; color: #007AFF; font-weight: bold; text-align: center;" onclick="openCalcModal('editAmountInput')">
-      <div class="modal-actions" style="margin-top: 25px;">
-        <button class="btn-cancel" onclick="closeEditModal()">取消</button>
-        <button style="background: #34A853;" onclick="saveEditRecord()">💾 儲存修改</button>
-      </div>
+      <div class="modal-actions" style="margin-top: 25px;"><button class="btn-cancel" onclick="closeEditModal()">取消</button><button style="background: #34A853;" onclick="saveEditRecord()">💾 儲存修改</button></div>
       <hr style="border: 0; height: 1px; background: #eee; margin: 20px 0;">
       <button style="background: #FF3B30; margin-top: 0; width: 100%;" onclick="confirmDeleteFromEdit()">🗑️ 刪除此筆紀錄</button>
     </div>
@@ -263,7 +258,7 @@
 
   <div class="modal-overlay" id="calcModal">
     <div class="modal-card" style="max-width: 380px;">
-      <div class="modal-title">🧮 計算金額</div>
+      <div class="modal-title">🧮 計算機</div>
       <div id="calcDisplay">0</div>
       <div class="calc-grid">
         <button class="calc-btn" onclick="calcInput('7')">7</button><button class="calc-btn" onclick="calcInput('8')">8</button><button class="calc-btn" onclick="calcInput('9')">9</button><button class="calc-btn calc-op" onclick="calcInput('+')">＋</button>
@@ -285,17 +280,16 @@
   </div>
 
   <script>
-    // 🌟 時區設定與自動備份
+    // ======== 系統初始與時區設定 ========
     function initTimezone() {
       const useTW = localStorage.getItem('useTaiwanTime') !== 'false';
-      updateTzUI(useTW);
-      document.getElementById('dateInput').value = getTodayDateString(useTW);
+      updateTzUI(useTW); document.getElementById('dateInput').value = getTodayDateString(useTW);
     }
     function toggleTimezone() {
       let useTW = localStorage.getItem('useTaiwanTime') !== 'false';
       useTW = !useTW; localStorage.setItem('useTaiwanTime', useTW);
       updateTzUI(useTW); document.getElementById('dateInput').value = getTodayDateString(useTW);
-      exportBackup({ silent: true }); // 觸發背景備份
+      exportBackup({ silent: true });
     }
     function updateTzUI(useTW) {
       const btn = document.getElementById('tzToggleBtn');
@@ -308,9 +302,10 @@
       return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
     }
 
-    // ⚠ GAS API URL (請替換為你的最新部署網址)
+    // ⚠ API 網址維持你的設定
     const apiUrl = "https://script.google.com/macros/s/AKfycbxvVEOlqWPu-MraLhOcOp2OkAX0zD5tOLJFwlbHkqtWQAu9MRBh4I3ek4U9yn0jfevl/exec";
     let localLedgerData = []; let expenseChartInstance = null; let currentLedger = 'home'; 
+    let chartMode = 'month'; let chartType = 'category'; 
 
     function getStoreKey(keyName) { return currentLedger === 'home' ? keyName : keyName + '_studio'; }
 
@@ -322,48 +317,12 @@
       if (document.querySelectorAll('.tab')[2].classList.contains('active')) { populateChartSelectors(); renderChart(); }
     }
 
-    let pressTimer = null; let isLongPress = false; let multiSelectMode = false; let selectedItemsMap = new Map(); 
-    function startPress(e, domId, uniqueKey, amount) { isLongPress = false; pressTimer = setTimeout(() => { isLongPress = true; if (navigator.vibrate) navigator.vibrate(50); if (!multiSelectMode) { multiSelectMode = true; document.getElementById('multiSelectBar').style.display = 'flex'; } toggleSelection(domId, uniqueKey, amount); }, 500); }
-    function endPress(e) { if (pressTimer) { clearTimeout(pressTimer); pressTimer = null; } }
-    function itemClick(e, domId, uniqueKey, itemStr) { if (isLongPress) return; if (multiSelectMode) { toggleSelection(domId, uniqueKey, parseFloat(JSON.parse(decodeURIComponent(itemStr)).amount.toString().replace(/,/g, '')) || 0); } else { openEditModal(itemStr); } }
-    function toggleSelection(domId, uniqueKey, amount) {
-      const el = document.getElementById(domId);
-      if (selectedItemsMap.has(uniqueKey)) { selectedItemsMap.delete(uniqueKey); if (el) { el.style.backgroundColor = ""; el.style.borderLeft = "4px solid #34C759"; } } 
-      else { selectedItemsMap.set(uniqueKey, amount); if (el) { el.style.backgroundColor = "#E3F2FD"; el.style.borderLeft = "6px solid #007AFF"; } }
-      let sum = 0; selectedItemsMap.forEach(v => sum += v);
-      document.getElementById('selectCount').innerText = selectedItemsMap.size; document.getElementById('selectSum').innerText = sum.toLocaleString();
-    }
-    function exitMultiSelect() { multiSelectMode = false; selectedItemsMap.clear(); document.getElementById('multiSelectBar').style.display = 'none'; filterLocalData(); }
-
-    let currentEditMode = ''; let tempEditingItems = []; 
-    const defaultCategories = "食品餐飲,治裝行頭,居家物業,行車交通,教育學習,休閒娛樂,醫療保健,人情往來,其他雜項,婦嬰用品,固定支出";
-    const defaultTags = "早餐,午餐,晚餐";
-    function openSettingsModal(mode) { currentEditMode = mode; document.getElementById('settingsModal').style.display = 'flex'; document.getElementById('modalNewInput').value = ''; document.getElementById('modalTitle').innerText = mode === 'categories' ? "🏷️ 管理記帳分類" : "📝 管理自訂標籤"; tempEditingItems = (localStorage.getItem(getStoreKey(mode === 'categories' ? 'myCustomCategories' : 'myCustomTags')) || (mode === 'categories' ? defaultCategories : defaultTags)).split(',').filter(t=>t.trim()!==''); renderModalList(); }
-    function closeSettingsModal() { document.getElementById('settingsModal').style.display = 'none'; }
-    function renderModalList() { document.getElementById('modalList').innerHTML = tempEditingItems.map((item, i) => `<div class="modal-list-item"><span>${item}</span><span class="delete-btn" onclick="removeModalItem(${i})">❌</span></div>`).join(''); }
-    function removeModalItem(i) { tempEditingItems.splice(i, 1); renderModalList(); }
-    function addModalItem() { const val = document.getElementById('modalNewInput').value.trim().replace(/,/g, ''); if (val) { tempEditingItems.push(val); document.getElementById('modalNewInput').value = ''; renderModalList(); } }
-    function saveSettingsModal() { 
-      localStorage.setItem(getStoreKey(currentEditMode === 'categories' ? 'myCustomCategories' : 'myCustomTags'), tempEditingItems.join(',')); 
-      currentEditMode === 'categories' ? loadCategories() : loadQuickTags(); 
-      closeSettingsModal(); exportBackup({ silent: true }); 
-    }
-    function loadCategories() { const cats = (localStorage.getItem(getStoreKey('myCustomCategories')) || defaultCategories).split(',').filter(t=>t.trim()!==''); document.getElementById('categoryInput').innerHTML = cats.map(c => `<option value="${c}">${c}</option>`).join(''); }
-    function loadQuickTags() { const tags = (localStorage.getItem(getStoreKey('myCustomTags')) || defaultTags).split(',').filter(t=>t.trim()!==''); document.getElementById('quickTagsContainer').innerHTML = tags.map(tag => `<span onclick="document.getElementById('itemInput').value='${tag} ';document.getElementById('itemInput').focus();">✨ ${tag}</span>`).join(''); }
-    function updateDatalist() {
-      if (!localLedgerData) return; const uniqueItems = new Set();
-      localLedgerData.filter(i => i.category !== "系統彙總").forEach(item => {
-        let cleanName = item.detail.trim().replace(/^(\d{2,3}\/)?\d{1,2}\/\d{1,2}\s*/, '').replace(/[\s\-$]*(NT\$?\vert{}\$)?\d+(?:\.\d+)?[元\s]*$/i, '').trim();
-        if (cleanName) uniqueItems.add(cleanName);
-      });
-      document.getElementById('historySuggestions').innerHTML = Array.from(uniqueItems).map(v => `<option value="${v}">`).join('');
-    }
-
+    // ======== 備份與還原 ========
     function exportBackup(options = {}) {
       const silent = options.silent === true;
       if (!silent && !confirm(`確定下載備份檔嗎？`)) return false;
       try {
-        const json = JSON.stringify({ ledgerData: localStorage.getItem(getStoreKey('myLedgerData')) || '[]', syncInfo: localStorage.getItem(getStoreKey('myLedgerSyncInfo')) || '', customTags: localStorage.getItem(getStoreKey('myCustomTags')) || defaultTags, customCategories: localStorage.getItem(getStoreKey('myCustomCategories')) || defaultCategories, useTaiwanTime: localStorage.getItem('useTaiwanTime') || 'true' });
+        const json = JSON.stringify({ ledgerData: localStorage.getItem(getStoreKey('myLedgerData')) || '[]', syncInfo: localStorage.getItem(getStoreKey('myLedgerSyncInfo')) || '', customTags: localStorage.getItem(getStoreKey('myCustomTags')), customCategories: localStorage.getItem(getStoreKey('myCustomCategories')), useTaiwanTime: localStorage.getItem('useTaiwanTime') });
         const now = new Date(); const timeStamp = `${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}_${String(now.getHours()).padStart(2,'0')}${String(now.getMinutes()).padStart(2,'0')}`;
         const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([json], { type: 'application/json' })); a.download = `${currentLedger === 'home' ? '家用雲帳本' : '工作室帳本'}_${timeStamp}.json`;
         a.click(); if (!silent) alert('✅ 備份成功！'); return true;
@@ -379,6 +338,7 @@
       }; reader.readAsText(file);
     }
 
+    // ======== 頁面切換與初始化 ========
     window.onload = function() {
       initTimezone();
       const currentTwYear = new Date().getFullYear() - 1911;
@@ -387,113 +347,79 @@
       document.getElementById('syncMonthSelect').value = (new Date().getMonth() + 1) + "月";
       
       loadCategories(); loadQuickTags(); loadLocalData(); 
-      autoSyncThisMonth(currentTwYear.toString(), (new Date().getMonth() + 1) + "月");
     };
 
-    function autoSyncThisMonth(targetYear, targetMonth) {
-      fetch(apiUrl, { method: "POST", body: JSON.stringify({ action: "sync_custom", targetYear, targetMonth, ledger: currentLedger }) }).then(res => res.text()).then(text => {
-        try { const res = JSON.parse(text); if (res.status === 'success') { const targetLabel = targetYear + "年 " + targetMonth; let finalData = JSON.parse(localStorage.getItem(getStoreKey('myLedgerData')) || '[]').filter(item => item.month !== targetLabel).concat(res.data); localStorage.setItem(getStoreKey('myLedgerData'), JSON.stringify(finalData)); localStorage.setItem(getStoreKey('myLedgerSyncInfo'), `上次同步：${new Date().toLocaleString()}`); loadLocalData(); } } catch(e) {}
-      });
-    }
-
     function switchTab(tabName) {
-      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active')); document.querySelectorAll('.view-section').forEach(v => v.classList.remove('active'));
+      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.view-section').forEach(v => v.classList.remove('active'));
       document.querySelectorAll('.tab')[tabName==='add'?0:tabName==='search'?1:2].classList.add('active');
       document.getElementById(tabName+'View').classList.add('active');
       if (tabName === 'search') loadLocalData(); 
       if (tabName === 'chart') { populateChartSelectors(); renderChart(); }
     }
 
+    // ======== 同步與網路請求 ========
     function submitData() {
       const data = { action: "add", ledger: currentLedger, date: document.getElementById('dateInput').value, category: document.getElementById('categoryInput').value, item: document.getElementById('itemInput').value, amount: document.getElementById('amountInput').value };
       if (!data.item || !data.amount) return alert("請填妥資料！");
-      document.getElementById('globalLoading').style.display = 'block';
+      document.getElementById('syncStatus').innerText = "⏳ 正在儲存到雲端...";
       fetch(apiUrl, { method: "POST", body: JSON.stringify(data) }).then(res => res.json()).then(res => {
         if (res.status === 'success') { alert("✅ 記帳成功！"); document.getElementById('itemInput').value = ''; document.getElementById('amountInput').value = ''; document.getElementById('dateInput').value = getTodayDateString(localStorage.getItem('useTaiwanTime') !== 'false'); document.getElementById('syncStatus').innerText = "⚠ 雲端有新資料，建議更新"; } else alert("❌ 錯誤：" + res.message);
-      }).finally(() => document.getElementById('globalLoading').style.display = 'none');
+      });
     }
 
-// ======== 同步排程任務 ========
     function syncData(mode) {
-      const currentTwYear = new Date().getFullYear() - 1911;
-      let queue = [];
-      
-      if (mode === 'this_month') {
-        queue.push({ year: currentTwYear.toString(), month: (new Date().getMonth() + 1) + "月" });
-        document.getElementById('syncStatus').innerText = "🔄 正在極速更新本月...";
-      } else if (mode === 'custom') {
-        let y = document.getElementById('syncYearSelect').value;
-        let m = document.getElementById('syncMonthSelect').value;
-        if (m === "全部") {
-          queue.push({ year: y, month: ["1月", "2月", "3月", "4月", "5月", "6月"] });
-          queue.push({ year: y, month: ["7月", "8月", "9月", "10月", "11月", "12月"] });
-        } else { 
-          queue.push({ year: y, month: m }); 
-        }
-        document.getElementById('syncStatus').innerText = "🔄 任務排程中...";
-      } else if (mode === 'all') {
-        if(!confirm("歷年完整同步將以「半年為單位」批次下載資料，確定要執行嗎？")) return;
-        for (let y = currentTwYear; y >= 102; y--) {
-          queue.push({ year: y.toString(), month: ["1月", "2月", "3月", "4月", "5月", "6月"] });
-          queue.push({ year: y.toString(), month: ["7月", "8月", "9月", "10月", "11月", "12月"] });
-        }
-        document.getElementById('syncStatus').innerText = "🔄 完整同步排程中...";
-      }
+      const currentTwYear = new Date().getFullYear() - 1911; let queue = [];
+      if (mode === 'this_month') { queue.push({ year: currentTwYear.toString(), month: (new Date().getMonth() + 1) + "月" }); document.getElementById('syncStatus').innerText = "🔄 更新本月中..."; } 
+      else if (mode === 'custom') { let y = document.getElementById('syncYearSelect').value, m = document.getElementById('syncMonthSelect').value; if (m === "全部") { queue.push({ year: y, month: ["1月", "2月", "3月", "4月", "5月", "6月"] }); queue.push({ year: y, month: ["7月", "8月", "9月", "10月", "11月", "12月"] }); } else queue.push({ year: y, month: m }); } 
+      else if (mode === 'all') { if(!confirm("確定完整同步？")) return; for (let y = currentTwYear; y >= 102; y--) { queue.push({ year: y.toString(), month: ["1月", "2月", "3月", "4月", "5月", "6月"] }); queue.push({ year: y.toString(), month: ["7月", "8月", "9月", "10月", "11月", "12月"] }); } }
       executeSyncQueue(queue, mode);
     }
 
-    // ======== 執行同步與更新畫面 ========
     async function executeSyncQueue(queue, mode) {
-      // 🌟 移除了上方 globalLoading 的顯示，畫面不會再被上方文字干擾
-      
       const startTime = performance.now();
       let finalData = mode === 'all' ? [] : JSON.parse(localStorage.getItem(getStoreKey('myLedgerData')) || '[]');
+      if (mode !== 'all') queue.forEach(q => { if (Array.isArray(q.month)) q.month.forEach(m => finalData = finalData.filter(item => item.month !== (q.year + "年 " + m))); else finalData = finalData.filter(item => item.month !== (q.year + "年 " + q.month)); });
       
-      if (mode !== 'all') {
-        queue.forEach(q => {
-          if (Array.isArray(q.month)) {
-            q.month.forEach(m => finalData = finalData.filter(item => item.month !== (q.year + "年 " + m)));
-          } else { 
-            finalData = finalData.filter(item => item.month !== (q.year + "年 " + q.month)); 
-          }
-        });
-      }
-
       for (let i = 0; i < queue.length; i++) {
-        let q = queue[i];
-        let monthLabel = Array.isArray(q.month) ? (q.month[0] === '1月' ? '上半年' : '下半年') : q.month;
-        
-        // 🌟 只更新下方進度，並在「抓取中」把文字變成顯眼的橘色
+        let q = queue[i]; let monthLabel = Array.isArray(q.month) ? (q.month[0] === '1月' ? '上半年' : '下半年') : q.month;
         let statusEl = document.getElementById('syncStatus');
         statusEl.innerText = `⏳ 正在抓取 ${q.year}年 ${monthLabel} (${i + 1}/${queue.length})...`;
         statusEl.style.color = "#FF9500"; 
         
-        try {
-          let res = await fetch(apiUrl, { method: "POST", body: JSON.stringify({ action: "sync_custom", targetYear: q.year, targetMonth: q.month, ledger: currentLedger }) });
+        try { 
+          let res = await fetch(apiUrl, { method: "POST", body: JSON.stringify({ action: "sync_custom", targetYear: q.year, targetMonth: q.month, ledger: currentLedger }) }); 
           let text = await res.text(); 
           try {
-            let json = JSON.parse(text);
+            let json = JSON.parse(text); 
             if (json.status === 'success' && json.data.length > 0) finalData = finalData.concat(json.data);
-          } catch (e) { continue; }
-        } catch (err) {}
+            else if (json.status === 'error') { alert("❌ 雲端回傳錯誤：\n" + json.message); break; }
+          } catch(e) { 
+            alert("❌ 嚴重錯誤：GAS 後端當機了！\n可能原因：程式碼有特殊符號，或是忘了發佈為新版本！"); 
+            document.getElementById('syncStatus').innerText = "❌ 同步失敗"; document.getElementById('syncStatus').style.color = "#FF3B30"; return; 
+          }
+        } catch (err) { alert("❌ 網路斷線"); break; }
       }
-
+      
       const duration = ((performance.now() - startTime) / 1000).toFixed(1);
       localStorage.setItem(getStoreKey('myLedgerData'), JSON.stringify(finalData));
-      localStorage.setItem(getStoreKey('myLedgerSyncInfo'), `上次同步時間：${new Date().toLocaleString()}\n(共 ${finalData.length} 筆，耗時 ${duration} 秒)`);
-      
-      alert(`✅ 同步完成！\n共更新了 ${finalData.length} 筆資料。`);
-      
-      // 🌟 同步完成後，把底部文字顏色變回原本的藍色
+      localStorage.setItem(getStoreKey('myLedgerSyncInfo'), `上次同步：${new Date().toLocaleString()}\n(共 ${finalData.length} 筆，耗時 ${duration} 秒)`);
+      alert(`✅ 同步完成！更新 ${finalData.length} 筆`);
       document.getElementById('syncStatus').style.color = "#007AFF"; 
-      
       loadLocalData(); 
     }
+
+    // ======== 查詢與過濾 ========
+    function loadLocalData() {
+      const stored = localStorage.getItem(getStoreKey('myLedgerData')); const info = localStorage.getItem(getStoreKey('myLedgerSyncInfo'));
+      if (stored && info) { localLedgerData = JSON.parse(stored); document.getElementById('syncStatus').innerText = info; updateDatalist(); filterLocalData(); } 
+      else { localLedgerData = []; document.getElementById('syncStatus').innerText = "尚未同步資料"; document.getElementById('resultBox').innerHTML = ''; }
+    }
+
     function filterLocalData() {
       const keyword = document.getElementById('searchInput').value.trim().toLowerCase();
-      // 🌟 過濾掉第二軌抓回來的系統彙總數據，維持清單乾淨
-      let filtered = localLedgerData.filter(item => item.category !== "系統彙總");
-      if (keyword) filtered = filtered.filter(item => item.detail.toLowerCase().includes(keyword) || item.amount.toLowerCase().includes(keyword));
+      let filtered = localLedgerData.filter(i => i.category !== "系統彙總"); // 🌟 隱藏圖表用資料
+      if (keyword) filtered = filtered.filter(i => i.detail.toLowerCase().includes(keyword) || i.amount.toLowerCase().includes(keyword));
       
       filtered.sort((a, b) => {
         const getVal = obj => { let m = obj.detail.match(/^(\d{2,3})\/(\d{1,2})\/(\d{1,2})/); if(m) return m[1]*10000 + m[2]*100 + parseInt(m[3]); m = obj.month.match(/(\d+)年\s*(\d+)月/); return m ? m[1]*10000 + m[2]*100 : 0; };
@@ -507,10 +433,38 @@
       }).join('');
     }
 
-    function openEditModal(itemStr) { /*...同前...*/ const i = JSON.parse(decodeURIComponent(itemStr)); document.getElementById('editMonth').value = i.month; document.getElementById('editOldCategory').value = i.category; document.getElementById('editOldDetail').value = i.detail; document.getElementById('editOldAmount').value = i.amount; document.getElementById('editMonthDisplay').innerText = `📍 ${i.month}`; document.getElementById('editDetailInput').value = i.detail; document.getElementById('editAmountInput').value = i.amount; document.getElementById('editCategoryInput').innerHTML = (localStorage.getItem(getStoreKey('myCustomCategories'))||defaultCategories).split(',').filter(t=>t.trim()!=='').map(c => `<option value="${c}">${c}</option>`).join(''); document.getElementById('editCategoryInput').value = i.category; document.getElementById('editModal').style.display = 'flex'; }
+    // ======== 項目互動 (編輯、刪除、長按) ========
+    let pressTimer = null; let isLongPress = false; let multiSelectMode = false; let selectedItemsMap = new Map(); 
+    function startPress(e, domId, uniqueKey, amount) { isLongPress = false; pressTimer = setTimeout(() => { isLongPress = true; if (navigator.vibrate) navigator.vibrate(50); if (!multiSelectMode) { multiSelectMode = true; document.getElementById('multiSelectBar').style.display = 'flex'; } toggleSelection(domId, uniqueKey, amount); }, 500); }
+    function endPress(e) { if (pressTimer) { clearTimeout(pressTimer); pressTimer = null; } }
+    function itemClick(e, domId, uniqueKey, itemStr) { if (isLongPress) return; if (multiSelectMode) { toggleSelection(domId, uniqueKey, parseFloat(JSON.parse(decodeURIComponent(itemStr)).amount.toString().replace(/,/g, '')) || 0); } else { openEditModal(itemStr); } }
+    function toggleSelection(domId, uniqueKey, amount) {
+      const el = document.getElementById(domId);
+      if (selectedItemsMap.has(uniqueKey)) { selectedItemsMap.delete(uniqueKey); if (el) { el.style.backgroundColor = ""; el.style.borderLeft = "4px solid #34C759"; } } 
+      else { selectedItemsMap.set(uniqueKey, amount); if (el) { el.style.backgroundColor = "#E3F2FD"; el.style.borderLeft = "6px solid #007AFF"; } }
+      let sum = 0; selectedItemsMap.forEach(v => sum += v);
+      document.getElementById('selectCount').innerText = selectedItemsMap.size; document.getElementById('selectSum').innerText = sum.toLocaleString();
+    }
+    function exitMultiSelect() { multiSelectMode = false; selectedItemsMap.clear(); document.getElementById('multiSelectBar').style.display = 'none'; filterLocalData(); }
+
+    function openEditModal(itemStr) { const i = JSON.parse(decodeURIComponent(itemStr)); document.getElementById('editMonth').value = i.month; document.getElementById('editOldCategory').value = i.category; document.getElementById('editOldDetail').value = i.detail; document.getElementById('editOldAmount').value = i.amount; document.getElementById('editMonthDisplay').innerText = `📍 ${i.month}`; document.getElementById('editDetailInput').value = i.detail; document.getElementById('editAmountInput').value = i.amount; document.getElementById('editCategoryInput').innerHTML = (localStorage.getItem(getStoreKey('myCustomCategories'))||defaultCategories).split(',').filter(t=>t.trim()!=='').map(c => `<option value="${c}">${c}</option>`).join(''); document.getElementById('editCategoryInput').value = i.category; document.getElementById('editModal').style.display = 'flex'; }
     function closeEditModal() { document.getElementById('editModal').style.display = 'none'; }
-    function saveEditRecord() { const d = { action:'edit', ledger:currentLedger, month:document.getElementById('editMonth').value, oldCategory:document.getElementById('editOldCategory').value, oldDetail:document.getElementById('editOldDetail').value, oldAmount:document.getElementById('editOldAmount').value, newCategory:document.getElementById('editCategoryInput').value, newDetail:document.getElementById('editDetailInput').value, newAmount:document.getElementById('editAmountInput').value }; if(!d.newDetail||!d.newAmount) return alert("請填寫完整"); closeEditModal(); document.getElementById('globalLoading').style.display = 'block'; fetch(apiUrl, { method: "POST", body: JSON.stringify(d) }).then(res => res.json()).then(res => { if(res.status==='success') { let idx = localLedgerData.findIndex(item => item.month===d.month && item.category===d.oldCategory && item.detail===d.oldDetail && item.amount===d.oldAmount); if (idx!==-1) { localLedgerData[idx].category=d.newCategory; localLedgerData[idx].detail=d.newDetail; localLedgerData[idx].amount=d.newAmount; localStorage.setItem(getStoreKey('myLedgerData'), JSON.stringify(localLedgerData)); filterLocalData(); } alert("✅ 修改成功"); } else alert("❌ 失敗: " + res.message); }).finally(() => document.getElementById('globalLoading').style.display='none'); }
-    function confirmDeleteFromEdit() { closeEditModal(); if(confirm("確定刪除此紀錄？")) { document.getElementById('globalLoading').style.display = 'block'; fetch(apiUrl, { method: "POST", body: JSON.stringify({ action: 'delete', ledger: currentLedger, month: document.getElementById('editMonth').value, category: document.getElementById('editOldCategory').value, detail: document.getElementById('editOldDetail').value, amount: document.getElementById('editOldAmount').value }) }).then(res => res.json()).then(res => { if(res.status==='success') { localLedgerData = localLedgerData.filter(i => !(i.month===document.getElementById('editMonth').value && i.detail===document.getElementById('editOldDetail').value)); localStorage.setItem(getStoreKey('myLedgerData'), JSON.stringify(localLedgerData)); filterLocalData(); alert("✅ 刪除成功"); } }).finally(() => document.getElementById('globalLoading').style.display='none'); } }
+    function saveEditRecord() { const d = { action:'edit', ledger:currentLedger, month:document.getElementById('editMonth').value, oldCategory:document.getElementById('editOldCategory').value, oldDetail:document.getElementById('editOldDetail').value, oldAmount:document.getElementById('editOldAmount').value, newCategory:document.getElementById('editCategoryInput').value, newDetail:document.getElementById('editDetailInput').value, newAmount:document.getElementById('editAmountInput').value }; if(!d.newDetail||!d.newAmount) return alert("請填寫完整"); closeEditModal(); fetch(apiUrl, { method: "POST", body: JSON.stringify(d) }).then(res => res.json()).then(res => { if(res.status==='success') { let idx = localLedgerData.findIndex(item => item.month===d.month && item.category===d.oldCategory && item.detail===d.oldDetail && item.amount===d.oldAmount); if (idx!==-1) { localLedgerData[idx].category=d.newCategory; localLedgerData[idx].detail=d.newDetail; localLedgerData[idx].amount=d.newAmount; localStorage.setItem(getStoreKey('myLedgerData'), JSON.stringify(localLedgerData)); filterLocalData(); } alert("✅ 修改成功"); } }); }
+    function confirmDeleteFromEdit() { closeEditModal(); if(confirm("確定刪除此紀錄？")) { fetch(apiUrl, { method: "POST", body: JSON.stringify({ action: 'delete', ledger: currentLedger, month: document.getElementById('editMonth').value, category: document.getElementById('editOldCategory').value, detail: document.getElementById('editOldDetail').value, amount: document.getElementById('editOldAmount').value }) }).then(res => res.json()).then(res => { if(res.status==='success') { localLedgerData = localLedgerData.filter(i => !(i.month===document.getElementById('editMonth').value && i.detail===document.getElementById('editOldDetail').value)); localStorage.setItem(getStoreKey('myLedgerData'), JSON.stringify(localLedgerData)); filterLocalData(); alert("✅ 刪除成功"); } }); } }
+
+    // ======== 分類標籤管理與計算機 ========
+    let currentEditMode = ''; let tempEditingItems = []; 
+    const defaultCategories = "食品餐飲,治裝行頭,居家物業,行車交通,教育學習,休閒娛樂,醫療保健,人情往來,其他雜項,婦嬰用品,固定支出";
+    const defaultTags = "早餐,午餐,晚餐";
+    function openSettingsModal(mode) { currentEditMode = mode; document.getElementById('settingsModal').style.display = 'flex'; document.getElementById('modalNewInput').value = ''; document.getElementById('modalTitle').innerText = mode === 'categories' ? "🏷️ 管理記帳分類" : "📝 管理自訂標籤"; tempEditingItems = (localStorage.getItem(getStoreKey(mode === 'categories' ? 'myCustomCategories' : 'myCustomTags')) || (mode === 'categories' ? defaultCategories : defaultTags)).split(',').filter(t=>t.trim()!==''); renderModalList(); }
+    function closeSettingsModal() { document.getElementById('settingsModal').style.display = 'none'; }
+    function renderModalList() { document.getElementById('modalList').innerHTML = tempEditingItems.map((item, i) => `<div class="modal-list-item"><span>${item}</span><span class="delete-btn" onclick="removeModalItem(${i})">❌</span></div>`).join(''); }
+    function removeModalItem(i) { tempEditingItems.splice(i, 1); renderModalList(); }
+    function addModalItem() { const val = document.getElementById('modalNewInput').value.trim().replace(/,/g, ''); if (val) { tempEditingItems.push(val); document.getElementById('modalNewInput').value = ''; renderModalList(); } }
+    function saveSettingsModal() { localStorage.setItem(getStoreKey(currentEditMode === 'categories' ? 'myCustomCategories' : 'myCustomTags'), tempEditingItems.join(',')); currentEditMode === 'categories' ? loadCategories() : loadQuickTags(); closeSettingsModal(); exportBackup({ silent: true }); }
+    function loadCategories() { const cats = (localStorage.getItem(getStoreKey('myCustomCategories')) || defaultCategories).split(',').filter(t=>t.trim()!==''); document.getElementById('categoryInput').innerHTML = cats.map(c => `<option value="${c}">${c}</option>`).join(''); }
+    function loadQuickTags() { const tags = (localStorage.getItem(getStoreKey('myCustomTags')) || defaultTags).split(',').filter(t=>t.trim()!==''); document.getElementById('quickTagsContainer').innerHTML = tags.map(tag => `<span onclick="document.getElementById('itemInput').value='${tag} ';document.getElementById('itemInput').focus();">✨ ${tag}</span>`).join(''); }
+    function updateDatalist() { if (!localLedgerData) return; const uniqueItems = new Set(); localLedgerData.filter(i=>i.category!=="系統彙總").forEach(item => { let cleanName = item.detail.trim().replace(/^(\d{2,3}\/)?\d{1,2}\/\d{1,2}\s*/, '').replace(/[\s\-$]*(NT\$?\vert{}\$)?\d+(?:\.\d+)?[元\s]*$/i, '').trim(); if (cleanName) uniqueItems.add(cleanName); }); document.getElementById('historySuggestions').innerHTML = Array.from(uniqueItems).map(v => `<option value="${v}">`).join(''); }
 
     let calcExpression = ''; let calcTargetInput = 'amountInput';
     function openCalcModal(tId = 'amountInput') { calcTargetInput = tId; document.getElementById('calcModal').style.display = 'flex'; calcExpression = document.getElementById(calcTargetInput).value || ''; updateCalcDisplay(); }
@@ -521,15 +475,13 @@
     function confirmCalc() { if (/[+\-*/]/.test(calcExpression)) calcEval(); if (calcExpression !== '錯誤' && calcExpression !== '') document.getElementById(calcTargetInput).value = calcExpression; closeCalcModal(); }
     function updateCalcDisplay() { document.getElementById('calcDisplay').innerText = calcExpression || '0'; }
 
-    // ======== 📊 圖表智慧核心 ========
-    let chartMode = 'month'; 
-    let chartType = 'category'; 
-    
+    // ======== 📊 圖表智慧引擎 (完美接合按鈕與選單) ========
     function setChartMode(mode) {
       chartMode = mode;
       document.querySelectorAll('.btn-mode').forEach(b => b.classList.remove('active'));
       document.getElementById('btnMode_' + mode).classList.add('active');
-      // 🌟 智慧隱藏月份選擇器
+      
+      // 智慧隱藏月份
       if (mode === 'year') {
         document.getElementById('chartMonthSelect').style.display = 'none';
         document.getElementById('chartYearLabel').style.display = 'none';
@@ -548,24 +500,38 @@
     }
 
     function populateChartSelectors() {
+      // 找出所有擁有資料的年份
       const years = new Set();
-      localLedgerData.forEach(item => { const m = item.month.match(/(\d+)年/); if (m) years.add(m[1]); });
-      const currentTwYear = new Date().getFullYear() - 1911; years.add(currentTwYear.toString());
+      localLedgerData.forEach(item => {
+        const m = item.month.match(/(\d+)年/);
+        if (m) years.add(parseInt(m[1]));
+      });
+      const currentTwYear = new Date().getFullYear() - 1911; 
+      years.add(currentTwYear);
       
-      const selectY = document.getElementById('chartYearSelect'); selectY.innerHTML = '';
+      const selectY = document.getElementById('chartYearSelect');
+      const currentValY = selectY.value; 
+      selectY.innerHTML = '';
       Array.from(years).sort((a,b)=>b-a).forEach(y => selectY.appendChild(new Option(y + "年", y)));
-      selectY.value = currentTwYear.toString();
-      document.getElementById('chartMonthSelect').value = (new Date().getMonth() + 1) + "月";
+      
+      if(Array.from(selectY.options).some(o => o.value == currentValY)) selectY.value = currentValY; 
+      else selectY.value = currentTwYear;
+
+      const currentMonth = (new Date().getMonth() + 1) + "月";
+      const selectM = document.getElementById('chartMonthSelect');
+      if(!selectM.value) selectM.value = currentMonth;
     }
 
-    // ======== 📊 圖表智慧核心 (已修復「年」的對比 Bug) ========
     function renderChart() {
       const selYear = document.getElementById('chartYearSelect').value;
-      const selMonth = parseInt(document.getElementById('chartMonthSelect').value);
+      if(!selYear) return;
+      const selMonthStr = document.getElementById('chartMonthSelect').value;
+      const selMonth = parseInt(selMonthStr.replace('月', ''));
+      
       let targetMonths = [];
       let subtitle = "";
       
-      // 🌟 核心修復：補上「年」字與空格，讓它能跟快取裡的「115年 10月」完美配對！
+      // 🌟 結合模式 (單月/半年/全年)
       if (chartMode === 'year') {
         for(let i=1; i<=12; i++) targetMonths.push(`${selYear}年 ${i}月`);
         subtitle = `${selYear}年 全年分析`;
@@ -591,12 +557,11 @@
       const ctx = document.getElementById('expenseChart').getContext('2d');
       const totalInfo = document.getElementById('chartTotalInfo');
 
-      // ======== 圖表 A：分類佔比 / 堆疊趨勢 ========
+      // 模式 A：分類佔比
       if (chartType === 'category') {
         if (catData.length === 0) { totalInfo.innerText = "該區間尚無分類明細資料 🌵"; return; }
         
         if (chartMode === 'half') {
-          // 堆疊長條圖 (半年)
           let catMap = {}; let totalAmt = 0;
           catData.forEach(i => {
             let cat = i.category || "未分類"; let amt = parseFloat(i.amount.toString().replace(/,/g, '')) || 0;
@@ -606,13 +571,11 @@
           });
           const colors = ['#FF6384','#36A2EB','#FFCE56','#4BC0C0','#9966FF','#FF9F40','#8D6E63','#26A69A','#EC407A','#AB47BC'];
           let datasets = Object.keys(catMap).map((cat, idx) => ({ label: cat, data: catMap[cat], backgroundColor: colors[idx % colors.length] }));
-          
           let shortLabels = targetMonths.map(m => m.split(' ')[1]); 
           
           expenseChartInstance = new Chart(ctx, { type: 'bar', data: { labels: shortLabels, datasets: datasets }, options: { responsive: true, maintainAspectRatio: false, scales: { x: { stacked: true }, y: { stacked: true } } } });
           totalInfo.innerText = `${subtitle}\n總支出：$ ${totalAmt.toLocaleString()}`;
         } else {
-          // 甜甜圈圖 (單月/整年)
           let categoryTotals = {}; let totalAmt = 0;
           catData.forEach(i => {
             let cat = i.category || "未分類"; let amt = parseFloat(i.amount.toString().replace(/,/g, '')) || 0;
@@ -622,12 +585,11 @@
           totalInfo.innerText = `${subtitle}\n總支出：$ ${totalAmt.toLocaleString()}`;
         }
       } 
-      // ======== 圖表 B：收支結餘 ========
+      // 模式 B：收支結餘
       else {
         if (sumData.length === 0) { totalInfo.innerText = "該區間雲端試算表尚無「結餘總計」資料 🌵"; return; }
 
         if (chartMode === 'half') {
-          // 綠紅結餘柱狀圖 (半年趨勢)
           let balArray = targetMonths.map(tm => {
             let match = sumData.find(i => i.month === tm);
             if(match) { let d = JSON.parse(match.amount); return d.balance || 0; } return 0;
@@ -638,7 +600,6 @@
           expenseChartInstance = new Chart(ctx, { type: 'bar', data: { labels: shortLabels, datasets: [{ label: '單月結餘', data: balArray, backgroundColor: balColors }] }, options: { responsive: true, maintainAspectRatio: false } });
           totalInfo.innerText = `${subtitle}\n半年結餘趨勢分析`;
         } else {
-          // 三根長條圖 (單月/整年總計)
           let tInc = 0, tExp = 0, tBal = 0;
           sumData.forEach(i => { let d = JSON.parse(i.amount); tInc += d.income || 0; tExp += d.expense || 0; tBal += d.balance || 0; });
           
