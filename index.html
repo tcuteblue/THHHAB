@@ -379,26 +379,49 @@
     async function executeSyncQueue(queue, mode) {
       const startTime = performance.now();
       let finalData = mode === 'all' ? [] : JSON.parse(localStorage.getItem(getStoreKey('myLedgerData')) || '[]');
-      if (mode !== 'all') queue.forEach(q => { if (Array.isArray(q.month)) q.month.forEach(m => finalData = finalData.filter(item => item.month !== (q.year + "年 " + m))); else finalData = finalData.filter(item => item.month !== (q.year + "年 " + q.month)); });
       
+      if (mode !== 'all') {
+        queue.forEach(q => {
+          if (Array.isArray(q.month)) {
+            q.month.forEach(m => finalData = finalData.filter(item => item.month !== (q.year + "年 " + m)));
+          } else { 
+            finalData = finalData.filter(item => item.month !== (q.year + "年 " + q.month)); 
+          }
+        });
+      }
+
       for (let i = 0; i < queue.length; i++) {
-        let q = queue[i]; let monthLabel = Array.isArray(q.month) ? (q.month[0] === '1月' ? '上半年' : '下半年') : q.month;
+        let q = queue[i]; 
+        let monthLabel = Array.isArray(q.month) ? (q.month[0] === '1月' ? '上半年' : '下半年') : q.month;
         let statusEl = document.getElementById('syncStatus');
         statusEl.innerText = `⏳ 正在抓取 ${q.year}年 ${monthLabel} (${i + 1}/${queue.length})...`;
         statusEl.style.color = "#FF9500"; 
         
-        try { 
-          let res = await fetch(apiUrl, { method: "POST", body: JSON.stringify({ action: "sync_custom", targetYear: q.year, targetMonth: q.month, ledger: currentLedger }) }); 
-          let text = await res.text(); 
-          try {
-            let json = JSON.parse(text); 
-            if (json.status === 'success' && json.data.length > 0) finalData = finalData.concat(json.data);
-            else if (json.status === 'error') { alert("❌ 雲端回傳錯誤：\n" + json.message); break; }
-          } catch(e) { 
-            alert("❌ 嚴重錯誤：GAS 後端當機了！\n可能原因：程式碼有特殊符號，或是忘了發佈為新版本！"); 
-            document.getElementById('syncStatus').innerText = "❌ 同步失敗"; document.getElementById('syncStatus').style.color = "#FF3B30"; return; 
+        let retry = 0;
+        let success = false;
+        
+        while (retry < 2 && !success) { // 遇到斷線最多自動重試 2 次
+          try { 
+            let res = await fetch(apiUrl, { method: "POST", body: JSON.stringify({ action: "sync_custom", targetYear: q.year, targetMonth: q.month, ledger: currentLedger }) }); 
+            let text = await res.text(); 
+            try {
+              let json = JSON.parse(text); 
+              if (json.status === 'success' && json.data.length > 0) finalData = finalData.concat(json.data);
+              success = true; // 抓取成功，跳出重試迴圈
+            } catch(e) { 
+              success = true; // 如果是伺服器資料格式問題，略過不重試
+            }
+          } catch (err) { 
+            retry++;
+            if (retry < 2) {
+              statusEl.innerText = `⚠️ 網路擁擠，${q.year}年 ${monthLabel} 自動重試中...`;
+              await new Promise(r => setTimeout(r, 1000)); // 斷線後休息 1 秒再試
+            }
           }
-        } catch (err) { alert("❌ 網路斷線"); break; }
+        }
+        
+        // 🌟 核心防護：每次請求後強制休息 0.5 秒，避免被 Google 當作惡意攻擊而切斷連線！
+        await new Promise(r => setTimeout(r, 500));
       }
       
       const duration = ((performance.now() - startTime) / 1000).toFixed(1);
