@@ -560,19 +560,20 @@
       document.getElementById('chartMonthSelect').value = (new Date().getMonth() + 1) + "月";
     }
 
+    // ======== 📊 圖表智慧核心 (已修復「年」的對比 Bug) ========
     function renderChart() {
       const selYear = document.getElementById('chartYearSelect').value;
       const selMonth = parseInt(document.getElementById('chartMonthSelect').value);
       let targetMonths = [];
       let subtitle = "";
       
-      // 🌟 計算目標月份陣列 (單月 / 整年 / 往回推6個月)
+      // 🌟 修正：補上之前遺漏的「年」字，這樣才能正確比對快取資料庫
       if (chartMode === 'year') {
-        for(let i=1; i<=12; i++) targetMonths.push(`${selYear} ${i}月`);
-        subtitle = `${selYear} 全年分析`;
+        for(let i=1; i<=12; i++) targetMonths.push(`${selYear}年 ${i}月`);
+        subtitle = `${selYear}年 全年分析`;
       } else if (chartMode === 'month') {
-        targetMonths.push(`${selYear} ${selMonth}月`);
-        subtitle = `${selYear} ${selMonth}月 分析`;
+        targetMonths.push(`${selYear}年 ${selMonth}月`);
+        subtitle = `${selYear}年 ${selMonth}月 分析`;
       } else if (chartMode === 'half') {
         let y = parseInt(selYear);
         for(let i=5; i>=0; i--) {
@@ -608,7 +609,10 @@
           const colors = ['#FF6384','#36A2EB','#FFCE56','#4BC0C0','#9966FF','#FF9F40','#8D6E63','#26A69A','#EC407A','#AB47BC'];
           let datasets = Object.keys(catMap).map((cat, idx) => ({ label: cat, data: catMap[cat], backgroundColor: colors[idx % colors.length] }));
           
-          expenseChartInstance = new Chart(ctx, { type: 'bar', data: { labels: targetMonths, datasets: datasets }, options: { responsive: true, maintainAspectRatio: false, scales: { x: { stacked: true }, y: { stacked: true } } } });
+          // 優化：X軸只顯示「月份」比較不擁擠
+          let shortLabels = targetMonths.map(m => m.split(' ')[1]); 
+          
+          expenseChartInstance = new Chart(ctx, { type: 'bar', data: { labels: shortLabels, datasets: datasets }, options: { responsive: true, maintainAspectRatio: false, scales: { x: { stacked: true }, y: { stacked: true } } } });
           totalInfo.innerText = `${subtitle}\n總支出：$ ${totalAmt.toLocaleString()}`;
         } else {
           // 甜甜圈圖 (單月/整年)
@@ -631,8 +635,9 @@
             let match = sumData.find(i => i.month === tm);
             if(match) { let d = JSON.parse(match.amount); return d.balance || 0; } return 0;
           });
-          let balColors = balArray.map(v => v >= 0 ? '#34C759' : '#FF3B30'); // 正綠負紅
-          expenseChartInstance = new Chart(ctx, { type: 'bar', data: { labels: targetMonths.map(m=>m.split(' ')[1]), datasets: [{ label: '單月結餘', data: balArray, backgroundColor: balColors }] }, options: { responsive: true, maintainAspectRatio: false } });
+          let balColors = balArray.map(v => v >= 0 ? '#34C759' : '#FF3B30'); 
+          let shortLabels = targetMonths.map(m => m.split(' ')[1]);
+          expenseChartInstance = new Chart(ctx, { type: 'bar', data: { labels: shortLabels, datasets: [{ label: '單月結餘', data: balArray, backgroundColor: balColors }] }, options: { responsive: true, maintainAspectRatio: false } });
           totalInfo.innerText = `${subtitle}\n半年結餘趨勢分析`;
         } else {
           // 三根長條圖 (單月/整年總計)
