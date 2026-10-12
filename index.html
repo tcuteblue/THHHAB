@@ -531,7 +531,6 @@
       let targetMonths = [];
       let subtitle = "";
       
-      // 🌟 結合模式 (單月/半年/全年)
       if (chartMode === 'year') {
         for(let i=1; i<=12; i++) targetMonths.push(`${selYear}年 ${i}月`);
         subtitle = `${selYear}年 全年分析`;
@@ -548,9 +547,10 @@
         subtitle = `近半年 (${targetMonths[0]} ~ ${targetMonths[5]}) 分析`;
       }
 
-      // 提取兩軌資料
       const rawData = localLedgerData.filter(i => targetMonths.includes(i.month));
-      const catData = rawData.filter(i => i.category !== "系統彙總");
+      
+      // 🌟 核心修改 1：把「收入」相關的分類從「支出佔比圓餅圖」中徹底剃除！
+      const catData = rawData.filter(i => i.category !== "系統彙總" && i.category !== "收入" && !i.category.includes("收入"));
       const sumData = rawData.filter(i => i.category === "系統彙總");
 
       if (expenseChartInstance) { expenseChartInstance.destroy(); expenseChartInstance = null; }
@@ -559,7 +559,7 @@
 
       // 模式 A：分類佔比
       if (chartType === 'category') {
-        if (catData.length === 0) { totalInfo.innerText = "該區間尚無分類明細資料 🌵"; return; }
+        if (catData.length === 0) { totalInfo.innerText = "該區間尚無支出明細資料 🌵"; return; }
         
         if (chartMode === 'half') {
           let catMap = {}; let totalAmt = 0;
@@ -597,14 +597,15 @@
           let balColors = balArray.map(v => v >= 0 ? '#34C759' : '#FF3B30'); 
           let shortLabels = targetMonths.map(m => m.split(' ')[1]);
           
-          expenseChartInstance = new Chart(ctx, { type: 'bar', data: { labels: shortLabels, datasets: [{ label: '單月結餘', data: balArray, backgroundColor: balColors }] }, options: { responsive: true, maintainAspectRatio: false } });
+          expenseChartInstance = new Chart(ctx, { type: 'bar', data: { labels: shortLabels, datasets: [{ label: '單月淨結餘', data: balArray, backgroundColor: balColors }] }, options: { responsive: true, maintainAspectRatio: false } });
           totalInfo.innerText = `${subtitle}\n半年結餘趨勢分析`;
         } else {
           let tInc = 0, tExp = 0, tBal = 0;
           sumData.forEach(i => { let d = JSON.parse(i.amount); tInc += d.income || 0; tExp += d.expense || 0; tBal += d.balance || 0; });
           
+          // 🌟 核心修改 2：把總收入的顏色改成專屬藍色 (#007AFF)！
           expenseChartInstance = new Chart(ctx, { type: 'bar', data: { labels: ['收支水位分析'], datasets: [
-            { label: '總收入', data: [tInc], backgroundColor: '#34C759' },
+            { label: '總收入', data: [tInc], backgroundColor: '#007AFF' },
             { label: '總支出', data: [tExp], backgroundColor: '#FF3B30' },
             { label: '淨結餘', data: [tBal], backgroundColor: tBal >= 0 ? '#34C759' : '#FF3B30' }
           ] }, options: { responsive: true, maintainAspectRatio: false } });
