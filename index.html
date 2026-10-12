@@ -565,7 +565,7 @@
       let targetMonths = [];
       let subtitle = "";
       
-      // 🌟 修正：補上之前遺漏的「年」字，這樣才能正確比對快取資料庫
+      // 🌟 核心修復：補上「年」字與空格，讓它能跟快取裡的「115年 10月」完美配對！
       if (chartMode === 'year') {
         for(let i=1; i<=12; i++) targetMonths.push(`${selYear}年 ${i}月`);
         subtitle = `${selYear}年 全年分析`;
@@ -607,7 +607,6 @@
           const colors = ['#FF6384','#36A2EB','#FFCE56','#4BC0C0','#9966FF','#FF9F40','#8D6E63','#26A69A','#EC407A','#AB47BC'];
           let datasets = Object.keys(catMap).map((cat, idx) => ({ label: cat, data: catMap[cat], backgroundColor: colors[idx % colors.length] }));
           
-          // 優化：X軸只顯示「月份」比較不擁擠
           let shortLabels = targetMonths.map(m => m.split(' ')[1]); 
           
           expenseChartInstance = new Chart(ctx, { type: 'bar', data: { labels: shortLabels, datasets: datasets }, options: { responsive: true, maintainAspectRatio: false, scales: { x: { stacked: true }, y: { stacked: true } } } });
@@ -625,7 +624,7 @@
       } 
       // ======== 圖表 B：收支結餘 ========
       else {
-        if (sumData.length === 0) { totalInfo.innerText = "該區間雲端試算表尚無「總計」欄位資料 🌵"; return; }
+        if (sumData.length === 0) { totalInfo.innerText = "該區間雲端試算表尚無「結餘總計」資料 🌵"; return; }
 
         if (chartMode === 'half') {
           // 綠紅結餘柱狀圖 (半年趨勢)
@@ -635,6 +634,7 @@
           });
           let balColors = balArray.map(v => v >= 0 ? '#34C759' : '#FF3B30'); 
           let shortLabels = targetMonths.map(m => m.split(' ')[1]);
+          
           expenseChartInstance = new Chart(ctx, { type: 'bar', data: { labels: shortLabels, datasets: [{ label: '單月結餘', data: balArray, backgroundColor: balColors }] }, options: { responsive: true, maintainAspectRatio: false } });
           totalInfo.innerText = `${subtitle}\n半年結餘趨勢分析`;
         } else {
