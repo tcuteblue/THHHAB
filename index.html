@@ -281,9 +281,7 @@
   </div>
 
   <script>
-    // 🌟 啟動圖表數字標籤外掛
-  Chart.register(ChartDataLabels);
-    // ======== 系統初始與時區設定 ========
+       // ======== 系統初始與時區設定 ========
     function initTimezone() {
       const useTW = localStorage.getItem('useTaiwanTime') !== 'false';
       updateTzUI(useTW); document.getElementById('dateInput').value = getTodayDateString(useTW);
