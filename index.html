@@ -11,7 +11,8 @@
   
   <!-- 載入 Chart.js 供圖表使用 -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
+  <!-- 🌟 新增這一行：載入數字標籤外掛 -->
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2"></script>
   <script>
     // ======== 1. 動態生成 Manifest ========
     let baseUrl = window.location.href.split('?')[0].replace(/index\.html$/, '');
@@ -280,6 +281,8 @@
   </div>
 
   <script>
+    // 🌟 啟動圖表數字標籤外掛
+  Chart.register(ChartDataLabels);
     // ======== 系統初始與時區設定 ========
     function initTimezone() {
       const useTW = localStorage.getItem('useTaiwanTime') !== 'false';
@@ -571,8 +574,6 @@
       }
 
       const rawData = localLedgerData.filter(i => targetMonths.includes(i.month));
-      
-      // 🌟 核心修改 1：把「收入」相關的分類從「支出佔比圓餅圖」中徹底剃除！
       const catData = rawData.filter(i => i.category !== "系統彙總" && i.category !== "收入" && !i.category.includes("收入"));
       const sumData = rawData.filter(i => i.category === "系統彙總");
 
@@ -580,7 +581,7 @@
       const ctx = document.getElementById('expenseChart').getContext('2d');
       const totalInfo = document.getElementById('chartTotalInfo');
 
-      // 模式 A：分類佔比
+      // ======== 模式 A：分類佔比 ========
       if (chartType === 'category') {
         if (catData.length === 0) { totalInfo.innerText = "該區間尚無支出明細資料 🌵"; return; }
         
@@ -596,7 +597,16 @@
           let datasets = Object.keys(catMap).map((cat, idx) => ({ label: cat, data: catMap[cat], backgroundColor: colors[idx % colors.length] }));
           let shortLabels = targetMonths.map(m => m.split(' ')[1]); 
           
-          expenseChartInstance = new Chart(ctx, { type: 'bar', data: { labels: shortLabels, datasets: datasets }, options: { responsive: true, maintainAspectRatio: false, scales: { x: { stacked: true }, y: { stacked: true } } } });
+          expenseChartInstance = new Chart(ctx, { 
+            type: 'bar', data: { labels: shortLabels, datasets: datasets }, 
+            options: { 
+              responsive: true, maintainAspectRatio: false, scales: { x: { stacked: true }, y: { stacked: true } },
+              plugins: { 
+                legend: { position: 'bottom' },
+                datalabels: { color: '#fff', font: { weight: 'bold', size: 10 }, formatter: (value) => value > 0 ? value.toLocaleString() : '' }
+              } 
+            } 
+          });
           totalInfo.innerText = `${subtitle}\n總支出：$ ${totalAmt.toLocaleString()}`;
         } else {
           let categoryTotals = {}; let totalAmt = 0;
@@ -604,11 +614,20 @@
             let cat = i.category || "未分類"; let amt = parseFloat(i.amount.toString().replace(/,/g, '')) || 0;
             categoryTotals[cat] = (categoryTotals[cat] || 0) + amt; totalAmt += amt;
           });
-          expenseChartInstance = new Chart(ctx, { type: 'doughnut', data: { labels: Object.keys(categoryTotals), datasets: [{ data: Object.values(categoryTotals), backgroundColor: ['#FF6384','#36A2EB','#FFCE56','#4BC0C0','#9966FF','#FF9F40','#8D6E63','#26A69A','#EC407A'] }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } } });
+          expenseChartInstance = new Chart(ctx, { 
+            type: 'doughnut', data: { labels: Object.keys(categoryTotals), datasets: [{ data: Object.values(categoryTotals), backgroundColor: ['#FF6384','#36A2EB','#FFCE56','#4BC0C0','#9966FF','#FF9F40','#8D6E63','#26A69A','#EC407A'] }] }, 
+            options: { 
+              responsive: true, maintainAspectRatio: false, 
+              plugins: { 
+                legend: { position: 'bottom' },
+                datalabels: { color: '#fff', font: { weight: 'bold', size: 13 }, formatter: (value) => value > 0 ? value.toLocaleString() : '' }
+              } 
+            } 
+          });
           totalInfo.innerText = `${subtitle}\n總支出：$ ${totalAmt.toLocaleString()}`;
         }
       } 
-      // 模式 B：收支結餘
+      // ======== 模式 B：收支結餘 ========
       else {
         if (sumData.length === 0) { totalInfo.innerText = "該區間雲端試算表尚無「結餘總計」資料 🌵"; return; }
 
@@ -620,18 +639,39 @@
           let balColors = balArray.map(v => v >= 0 ? '#34C759' : '#FF3B30'); 
           let shortLabels = targetMonths.map(m => m.split(' ')[1]);
           
-          expenseChartInstance = new Chart(ctx, { type: 'bar', data: { labels: shortLabels, datasets: [{ label: '單月淨結餘', data: balArray, backgroundColor: balColors }] }, options: { responsive: true, maintainAspectRatio: false } });
+          expenseChartInstance = new Chart(ctx, { 
+            type: 'bar', data: { labels: shortLabels, datasets: [{ label: '單月淨結餘', data: balArray, backgroundColor: balColors }] }, 
+            options: { 
+              responsive: true, maintainAspectRatio: false, layout: { padding: { top: 20 } },
+              plugins: { 
+                legend: { position: 'bottom' },
+                datalabels: { color: '#333', anchor: 'end', align: 'top', font: { weight: 'bold', size: 12 }, formatter: (value) => value.toLocaleString() }
+              } 
+            } 
+          });
           totalInfo.innerText = `${subtitle}\n半年結餘趨勢分析`;
         } else {
           let tInc = 0, tExp = 0, tBal = 0;
           sumData.forEach(i => { let d = JSON.parse(i.amount); tInc += d.income || 0; tExp += d.expense || 0; tBal += d.balance || 0; });
           
-          // 🌟 核心修改 2：把總收入的顏色改成專屬藍色 (#007AFF)！
-          expenseChartInstance = new Chart(ctx, { type: 'bar', data: { labels: ['收支水位分析'], datasets: [
-            { label: '總收入', data: [tInc], backgroundColor: '#007AFF' },
-            { label: '總支出', data: [tExp], backgroundColor: '#FF3B30' },
-            { label: '淨結餘', data: [tBal], backgroundColor: tBal >= 0 ? '#34C759' : '#FF3B30' }
-          ] }, options: { responsive: true, maintainAspectRatio: false } });
+          expenseChartInstance = new Chart(ctx, { 
+            type: 'bar', 
+            data: { 
+              labels: ['收支水位分析'], 
+              datasets: [
+                { label: '總收入', data: [tInc], backgroundColor: '#007AFF' },
+                { label: '總支出', data: [tExp], backgroundColor: '#FF3B30' },
+                { label: '淨結餘', data: [tBal], backgroundColor: tBal >= 0 ? '#34C759' : '#FF3B30' }
+              ] 
+            }, 
+            options: { 
+              responsive: true, maintainAspectRatio: false, layout: { padding: { top: 20 } },
+              plugins: { 
+                legend: { position: 'bottom' },
+                datalabels: { color: '#333', anchor: 'end', align: 'top', font: { weight: 'bold', size: 14 }, formatter: (value) => value.toLocaleString() }
+              } 
+            } 
+          });
           totalInfo.innerText = `${subtitle}\n總結餘：$ ${tBal.toLocaleString()}`;
         }
       }
