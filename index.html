@@ -9,12 +9,10 @@
   <link rel="apple-touch-icon" href="icon.ico">
   <link rel="manifest" id="manifest-link">
   
-  <!-- 載入 Chart.js 供圖表使用 -->
+  <!-- 載入 Chart.js 供圖表使用 (乾淨版，無外掛) -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <!-- 🌟 新增這一行：載入數字標籤外掛 -->
-  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2"></script>
+
   <script>
-    // ======== 1. 動態生成 Manifest ========
     let baseUrl = window.location.href.split('?')[0].replace(/index\.html$/, '');
     if (!baseUrl.endsWith('/')) baseUrl += '/';
     const absoluteIconUrl = new URL('icon.ico', baseUrl).href;
@@ -31,7 +29,6 @@
     const manifestBlob = new Blob([JSON.stringify(manifest)], {type: 'application/json'});
     document.getElementById('manifest-link').href = URL.createObjectURL(manifestBlob);
 
-    // ======== 2. Service Worker ========
     if ('serviceWorker' in navigator) {
       const swCode = `
         self.addEventListener('install', e => self.skipWaiting());
@@ -87,14 +84,12 @@
     @keyframes slideUp { from { bottom: -50px; opacity: 0; } to { bottom: 20px; opacity: 1; } }
     .multi-select-bar button { margin: 0; padding: 8px 15px; font-size: 16px; background: rgba(255,255,255,0.2); width: auto; }
 
-    /* 圖表專屬樣式 */
     .chart-mode-bar, .chart-type-bar { display: flex; background: #eee; border-radius: 8px; overflow: hidden; margin-bottom: 15px; }
     .btn-mode, .btn-type { flex: 1; text-align: center; padding: 10px; font-weight: bold; color: #666; cursor: pointer; font-size: 16px; transition: 0.2s; }
     .btn-mode.active { background: #555; color: white; }
     .btn-type.active { background: #007AFF; color: white; }
-    .chart-container { margin-top: 10px; position: relative; height: 320px; width: 100%; }
+    .chart-container { margin-top: 10px; position: relative; height: 350px; width: 100%; }
 
-    /* Modal 樣式 */
     .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 3000; justify-content: center; align-items: center; backdrop-filter: blur(3px); }
     .modal-card { background: white; width: 90%; max-width: 400px; border-radius: 16px; padding: 25px; box-sizing: border-box; box-shadow: 0 10px 25px rgba(0,0,0,0.1); animation: popIn 0.3s ease-out; }
     .modal-title { font-size: 22px; font-weight: bold; margin-bottom: 15px; color: #333; text-align: center; }
@@ -108,7 +103,6 @@
     .modal-actions button { margin-top: 0; flex: 1; padding: 14px; font-size: 18px; }
     .btn-cancel { background: #E0E0E0; color: #333; }
 
-    /* 計算機樣式 */
     .calc-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
     .calc-btn { background: #f8f9fa; color: #333; font-size: 28px; font-weight: bold; padding: 16px 0; border: 1px solid #ddd; border-radius: 8px; cursor: pointer; transition: 0.1s; margin-top: 0; }
     .calc-btn:active { background: #e2e6ea; transform: scale(0.95); }
@@ -183,7 +177,6 @@
         <button class="sync-btn" style="background: #34C759; margin-top: 10px;" onclick="syncData('custom')">⚙ 抓取指定月份</button>
         <button class="sync-btn" style="background: #FF9500; margin-top: 15px;" onclick="syncData('all')">🔄 歷年完整同步</button>
         
-        <!-- 🌟 放大的、無灰色、醒目的狀態列 -->
         <div class="sync-status" id="syncStatus" style="font-size: 18px; font-weight: bold; margin-top: 15px; color: #007AFF; text-align: center;">尚未同步資料</div>
       </div>
 
@@ -199,12 +192,12 @@
 
     <!-- 🔍 查詢帳目 -->
     <div id="searchView" class="view-section">
-      <label style="margin-top: 0;">🔍 萬用搜尋 (長按：多選加總 / 點擊：編輯)</label>
-      <input type="text" id="searchInput" placeholder="搜尋日期、品名或金額..." oninput="filterLocalData()">
+      <label style="margin-top: 0;">🔍 萬用搜尋 (支援空白分隔多關鍵字)</label>
+      <input type="text" id="searchInput" placeholder="例：112年 晚餐..." oninput="filterLocalData()">
       <div class="result-box" id="resultBox"></div>
     </div> 
 
-    <!-- 📊 圖表分析 (高級按鈕介面) -->
+    <!-- 📊 圖表分析 -->
     <div id="chartView" class="view-section">
       <div class="chart-type-bar">
         <div id="btnType_category" class="btn-type active" onclick="setChartType('category')">支出分類佔比</div>
@@ -281,7 +274,7 @@
   </div>
 
   <script>
-       // ======== 系統初始與時區設定 ========
+    // ======== 系統初始與時區設定 ========
     function initTimezone() {
       const useTW = localStorage.getItem('useTaiwanTime') !== 'false';
       updateTzUI(useTW); document.getElementById('dateInput').value = getTodayDateString(useTW);
@@ -303,7 +296,6 @@
       return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
     }
 
-    // ⚠ API 網址維持你的設定
     const apiUrl = "https://script.google.com/macros/s/AKfycbxvVEOlqWPu-MraLhOcOp2OkAX0zD5tOLJFwlbHkqtWQAu9MRBh4I3ek4U9yn0jfevl/exec";
     let localLedgerData = []; let expenseChartInstance = null; let currentLedger = 'home'; 
     let chartMode = 'month'; let chartType = 'category'; 
@@ -339,7 +331,6 @@
       }; reader.readAsText(file);
     }
 
-    // ======== 頁面切換與初始化 ========
     window.onload = function() {
       initTimezone();
       const currentTwYear = new Date().getFullYear() - 1911;
@@ -401,28 +392,43 @@
         let retry = 0;
         let success = false;
         
-        while (retry < 2 && !success) { // 遇到斷線最多自動重試 2 次
+        while (retry < 2 && !success) { 
           try { 
             let res = await fetch(apiUrl, { method: "POST", body: JSON.stringify({ action: "sync_custom", targetYear: q.year, targetMonth: q.month, ledger: currentLedger }) }); 
             let text = await res.text(); 
+            
             try {
               let json = JSON.parse(text); 
-              if (json.status === 'success' && json.data.length > 0) finalData = finalData.concat(json.data);
-              success = true; // 抓取成功，跳出重試迴圈
+              if (json.status === 'success') {
+                if (json.data.length > 0) finalData = finalData.concat(json.data);
+                success = true; 
+              } else {
+                alert("❌ 雲端拒絕請求：\n" + json.message);
+                return;
+              }
             } catch(e) { 
-              success = true; // 如果是伺服器資料格式問題，略過不重試
+              if (retry === 1) {
+                alert("❌ 雲端連線異常，同步已安全中斷。\n您的本地資料已受到保護，請稍後再試。");
+                document.getElementById('syncStatus').innerText = "❌ 同步中斷 (資料已保護)"; 
+                document.getElementById('syncStatus').style.color = "#FF3B30"; 
+                return;
+              }
+              throw new Error("Parse Error"); 
             }
           } catch (err) { 
             retry++;
             if (retry < 2) {
-              statusEl.innerText = `⚠️ 網路擁擠，${q.year}年 ${monthLabel} 自動重試中...`;
-              await new Promise(r => setTimeout(r, 1000)); // 斷線後休息 1 秒再試
+              statusEl.innerText = `⚠️ 網路擁擠，自動重試中...`;
+              await new Promise(r => setTimeout(r, 1500)); 
+            } else {
+              alert(`❌ 連續斷線！同步已安全中斷，您的資料不會遺失。`);
+              document.getElementById('syncStatus').innerText = "❌ 網路斷線"; 
+              document.getElementById('syncStatus').style.color = "#FF3B30"; 
+              return; 
             }
           }
         }
-        
-        // 🌟 核心防護：每次請求後強制休息 0.5 秒，避免被 Google 當作惡意攻擊而切斷連線！
-        await new Promise(r => setTimeout(r, 500));
+        await new Promise(r => setTimeout(r, 500)); 
       }
       
       const duration = ((performance.now() - startTime) / 1000).toFixed(1);
@@ -433,35 +439,52 @@
       loadLocalData(); 
     }
 
-    // ======== 查詢與過濾 ========
+    // ======== 🔍 搜尋引擎 (升級版：支援多關鍵字空白分隔、不打字不卡頓、載入更多) ========
+    let searchDisplayLimit = 100;
+
     function loadLocalData() {
       const stored = localStorage.getItem(getStoreKey('myLedgerData')); const info = localStorage.getItem(getStoreKey('myLedgerSyncInfo'));
       if (stored && info) { localLedgerData = JSON.parse(stored); document.getElementById('syncStatus').innerText = info; updateDatalist(); filterLocalData(); } 
       else { localLedgerData = []; document.getElementById('syncStatus').innerText = "尚未同步資料"; document.getElementById('resultBox').innerHTML = ''; }
     }
 
-    // ======== 🔍 搜尋引擎 (加入防卡頓、防當機機制) ========
     function filterLocalData() {
-      const keyword = document.getElementById('searchInput').value.trim().toLowerCase();
+      searchDisplayLimit = 100; // 重新輸入字時，重置顯示筆數
+      renderSearchResults();
+    }
+
+    function loadMoreResults() {
+      searchDisplayLimit += 200; // 點擊按鈕多顯示 200 筆
+      renderSearchResults();
+    }
+
+    function renderSearchResults() {
+      const keywordInput = document.getElementById('searchInput').value.trim().toLowerCase();
       const resultBox = document.getElementById('resultBox');
       
-      // 🌟 修正 1：如果沒有輸入字，顯示提示，【絕對不渲染 12000 筆資料】，徹底解決卡頓！
-      if (!keyword) { 
-        resultBox.innerHTML = '<div class="result-item" style="text-align:center; color:#888; background:transparent; border:none; box-shadow:none; font-size:16px;">👆 請在上方輸入日期、品名或金額開始搜尋</div>'; 
+      // 🌟 未輸入關鍵字時提示，不渲染任何資料，確保 12000 筆資料絕對不會造成畫面卡死
+      if (!keywordInput) { 
+        resultBox.innerHTML = '<div class="result-item" style="text-align:center; color:#888; background:transparent; border:none; box-shadow:none; font-size:16px;">👆 支援多關鍵字搜尋 (例：112年 晚餐)</div>'; 
         return; 
       }
 
+      // 🌟 支援用空白分隔多重關鍵字
+      const keywords = keywordInput.split(/\s+/);
       let filtered = localLedgerData.filter(i => i.category !== "系統彙總"); 
-      filtered = filtered.filter(i => i.detail.toLowerCase().includes(keyword) || i.amount.toString().toLowerCase().includes(keyword));
+      
+      filtered = filtered.filter(i => {
+        const combinedStr = `${i.month} ${i.category} ${i.detail} ${i.amount}`.toLowerCase();
+        return keywords.every(kw => combinedStr.includes(kw)); // 必須符合所有輸入的關鍵字
+      });
       
       filtered.sort((a, b) => {
         const getVal = obj => { let m = obj.detail.match(/^(\d{2,3})\/(\d{1,2})\/(\d{1,2})/); if(m) return m[1]*10000 + m[2]*100 + parseInt(m[3]); m = obj.month.match(/(\d+)年\s*(\d+)月/); return m ? m[1]*10000 + m[2]*100 : 0; };
         return getVal(b) - getVal(a);
       });
 
-      // 🌟 修正 2：如果搜尋結果超過 100 筆，只顯示前 100 筆，防止手機過熱卡死
-      const isOverLimit = filtered.length > 100;
-      if (isOverLimit) { filtered = filtered.slice(0, 100); }
+      const totalCount = filtered.length;
+      const isOverLimit = totalCount > searchDisplayLimit;
+      if (isOverLimit) { filtered = filtered.slice(0, searchDisplayLimit); }
 
       if (filtered.length === 0) {
         resultBox.innerHTML = '<div class="result-item" style="text-align:center;">找不到符合的紀錄 🥲</div>';
@@ -473,8 +496,15 @@
             <div class="result-amount" style="text-align: right; pointer-events: none;">$ ${item.amount}</div></div>`;
         }).join('');
         
+        // 🌟 超過上限時顯示「載入更多」按鈕
         if (isOverLimit) {
-          html += `<div class="result-item" style="text-align:center; color:#888; background:transparent; border:none; box-shadow:none; font-size:14px;">(為保持系統順暢，僅顯示前 100 筆，請輸入更精確的關鍵字)</div>`;
+          html += `<div style="text-align:center; padding: 10px 0 20px 0;">
+                     <button onclick="loadMoreResults()" style="background:#f0f2f5; color:#007AFF; border:2px solid #007AFF; margin-top:0; padding:12px 25px; font-size:18px; font-weight:bold; border-radius:25px; width:auto; cursor:pointer;">
+                       👇 載入更多 (還有 ${totalCount - searchDisplayLimit} 筆)
+                     </button>
+                   </div>`;
+        } else if (totalCount > 100) {
+          html += `<div style="text-align:center; color:#888; font-size:14px; margin-top:15px; padding-bottom: 20px;">✅ 已顯示全部 ${totalCount} 筆結果</div>`;
         }
         resultBox.innerHTML = html;
       }
@@ -522,14 +552,59 @@
     function confirmCalc() { if (/[+\-*/]/.test(calcExpression)) calcEval(); if (calcExpression !== '錯誤' && calcExpression !== '') document.getElementById(calcTargetInput).value = calcExpression; closeCalcModal(); }
     function updateCalcDisplay() { document.getElementById('calcDisplay').innerText = calcExpression || '0'; }
 
-    // ======== 📊 圖表引擎 (乾淨版：數字全移到下方圖例) ========
+    // ======== 📊 圖表智慧引擎 ========
+    function setChartMode(mode) {
+      chartMode = mode;
+      document.querySelectorAll('.btn-mode').forEach(b => b.classList.remove('active'));
+      document.getElementById('btnMode_' + mode).classList.add('active');
+      
+      if (mode === 'year') {
+        document.getElementById('chartMonthSelect').style.display = 'none';
+        document.getElementById('chartYearLabel').style.display = 'none';
+      } else {
+        document.getElementById('chartMonthSelect').style.display = 'inline-block';
+        document.getElementById('chartYearLabel').style.display = 'inline-block';
+      }
+      renderChart();
+    }
+    
+    function setChartType(type) {
+      chartType = type;
+      document.querySelectorAll('.btn-type').forEach(b => b.classList.remove('active'));
+      document.getElementById('btnType_' + type).classList.add('active');
+      renderChart();
+    }
+
+    function populateChartSelectors() {
+      const years = new Set();
+      localLedgerData.forEach(item => {
+        const m = item.month.match(/(\d+)年/);
+        if (m) years.add(parseInt(m[1]));
+      });
+      const currentTwYear = new Date().getFullYear() - 1911; 
+      years.add(currentTwYear);
+      
+      const selectY = document.getElementById('chartYearSelect');
+      const currentValY = selectY.value; 
+      selectY.innerHTML = '';
+      Array.from(years).sort((a,b)=>b-a).forEach(y => selectY.appendChild(new Option(y + "年", y)));
+      
+      if(Array.from(selectY.options).some(o => o.value == currentValY)) selectY.value = currentValY; 
+      else selectY.value = currentTwYear;
+
+      const currentMonth = (new Date().getMonth() + 1) + "月";
+      const selectM = document.getElementById('chartMonthSelect');
+      if(!selectM.value) selectM.value = currentMonth;
+    }
+
     function renderChart() {
       const selYear = document.getElementById('chartYearSelect').value;
       if(!selYear) return;
       const selMonthStr = document.getElementById('chartMonthSelect').value;
       const selMonth = parseInt(selMonthStr.replace('月', ''));
       
-      let targetMonths = []; let subtitle = "";
+      let targetMonths = [];
+      let subtitle = "";
       
       if (chartMode === 'year') {
         for(let i=1; i<=12; i++) targetMonths.push(`${selYear}年 ${i}月`);
@@ -569,7 +644,6 @@
           });
           const colors = ['#FF6384','#36A2EB','#FFCE56','#4BC0C0','#9966FF','#FF9F40','#8D6E63','#26A69A','#EC407A','#AB47BC'];
           
-          // 🌟 核心修改：計算半年各分類總和，並寫在下方圖例！
           let datasets = Object.keys(catMap).map((cat, idx) => {
             let catTotal = catMap[cat].reduce((a, b) => a + b, 0);
             return { 
@@ -584,7 +658,7 @@
             type: 'bar', data: { labels: shortLabels, datasets: datasets }, 
             options: { 
               responsive: true, maintainAspectRatio: false, scales: { x: { stacked: true }, y: { stacked: true } },
-              plugins: { legend: { position: 'bottom', labels: { font: { size: 14 } } }, datalabels: { display: false } } 
+              plugins: { legend: { position: 'bottom', labels: { font: { size: 13 } } } } 
             } 
           });
           totalInfo.innerText = `${subtitle}\n總支出：$ ${totalAmt.toLocaleString()}`;
@@ -599,7 +673,7 @@
 
           expenseChartInstance = new Chart(ctx, { 
             type: 'doughnut', data: { labels: labelsWithValues, datasets: [{ data: Object.values(categoryTotals), backgroundColor: ['#FF6384','#36A2EB','#FFCE56','#4BC0C0','#9966FF','#FF9F40','#8D6E63','#26A69A','#EC407A'] }] }, 
-            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { font: { size: 14 } } }, datalabels: { display: false } } } 
+            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { font: { size: 14 } } } } } 
           });
           totalInfo.innerText = `${subtitle}\n總支出：$ ${totalAmt.toLocaleString()}`;
         }
@@ -617,17 +691,15 @@
           let shortLabels = targetMonths.map(m => m.split(' ')[1]);
           let totalBal = balArray.reduce((a, b) => a + b, 0);
           
-          // 🌟 核心修改：把半年淨結餘總額標示在下方圖例
           expenseChartInstance = new Chart(ctx, { 
             type: 'bar', data: { labels: shortLabels, datasets: [{ label: `淨結餘 (區間總計: $ ${totalBal.toLocaleString()})`, data: balArray, backgroundColor: balColors }] }, 
-            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { font: { size: 14 } } }, datalabels: { display: false } } } 
+            options: { responsive: true, maintainAspectRatio: false, layout: { padding: { top: 20 } }, plugins: { legend: { position: 'bottom', labels: { font: { size: 14 } } } } } 
           });
           totalInfo.innerText = `${subtitle}\n半年結餘趨勢分析`;
         } else {
           let tInc = 0, tExp = 0, tBal = 0;
           sumData.forEach(i => { let d = JSON.parse(i.amount); tInc += d.income || 0; tExp += d.expense || 0; tBal += d.balance || 0; });
           
-          // 🌟 核心修改：各項總計移至下方
           expenseChartInstance = new Chart(ctx, { 
             type: 'bar', 
             data: { 
@@ -638,7 +710,7 @@
                 { label: `淨結餘：$ ${tBal.toLocaleString()}`, data: [tBal], backgroundColor: tBal >= 0 ? '#34C759' : '#FF3B30' }
               ] 
             }, 
-            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { font: { size: 14 } } }, datalabels: { display: false } } } 
+            options: { responsive: true, maintainAspectRatio: false, layout: { padding: { top: 20 } }, plugins: { legend: { position: 'bottom', labels: { font: { size: 14 } } } } } 
           });
           totalInfo.innerText = `${subtitle}\n總結餘：$ ${tBal.toLocaleString()}`;
         }
