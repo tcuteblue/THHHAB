@@ -181,10 +181,14 @@
       </div>
 
       <div style="background: #f8f9fa; padding: 15px; border-radius: 12px; border: 1px solid #eee; margin-top: 20px;">
-        <label style="margin-top: 0; color: #607D8B; font-size: 18px;">💾 本地資料備份與還原</label>
+        <label style="margin-top: 0; color: #607D8B; font-size: 18px;">💾 本地與雲端資料備份</label>
+        
+        <!-- 🌟 新增：手動雲端備份按鈕 -->
+        <button id="driveBackupBtn" style="background: #4285F4; margin-top: 10px; width: 100%; padding: 12px; font-size: 16px;" onclick="backupToDrive()">☁️ 手動備份至 Google 雲端</button>
+
         <div style="display: flex; gap: 10px; margin-top: 10px;">
-          <button style="background: #607D8B; margin-top: 0; flex: 1; padding: 12px; font-size: 16px;" onclick="exportBackup()">📥 匯出</button>
-          <button style="background: #78909C; margin-top: 0; flex: 1; padding: 12px; font-size: 16px;" onclick="document.getElementById('importBackupInput').click()">📤 匯入</button>
+          <button style="background: #607D8B; margin-top: 0; flex: 1; padding: 12px; font-size: 16px;" onclick="exportBackup()">📥 下載到手機</button>
+          <button style="background: #78909C; margin-top: 0; flex: 1; padding: 12px; font-size: 16px;" onclick="document.getElementById('importBackupInput').click()">📤 從手機匯入</button>
         </div>
         <input type="file" id="importBackupInput" accept=".json" style="display: none;" onchange="importBackup(event)">
       </div>
@@ -310,7 +314,9 @@
       if (document.querySelectorAll('.tab')[2].classList.contains('active')) { populateChartSelectors(); renderChart(); }
     }
 
-    // ======== 備份與還原 ========
+    // ======== 💾 本地與雲端備份系統 ========
+    
+    // 匯出到手機
     function exportBackup(options = {}) {
       const silent = options.silent === true;
       if (!silent && !confirm(`確定下載備份檔嗎？`)) return false;
@@ -318,9 +324,11 @@
         const json = JSON.stringify({ ledgerData: localStorage.getItem(getStoreKey('myLedgerData')) || '[]', syncInfo: localStorage.getItem(getStoreKey('myLedgerSyncInfo')) || '', customTags: localStorage.getItem(getStoreKey('myCustomTags')), customCategories: localStorage.getItem(getStoreKey('myCustomCategories')), useTaiwanTime: localStorage.getItem('useTaiwanTime') });
         const now = new Date(); const timeStamp = `${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}_${String(now.getHours()).padStart(2,'0')}${String(now.getMinutes()).padStart(2,'0')}`;
         const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([json], { type: 'application/json' })); a.download = `${currentLedger === 'home' ? '家用雲帳本' : '工作室帳本'}_${timeStamp}.json`;
-        a.click(); if (!silent) alert('✅ 備份成功！'); return true;
+        a.click(); if (!silent) alert('✅ 本地備份成功！'); return true;
       } catch (err) { if (!silent) alert('❌ 失敗：' + err.message); return false; }
     }
+    
+    // 從手機匯入
     function importBackup(e) {
       const file = e.target.files[0]; if (!file) return;
       if (!confirm(`⚠️ 這將覆蓋目前資料，確定匯入嗎？`)) { e.target.value = ''; return; }
@@ -329,6 +337,46 @@
         try { const d = JSON.parse(evt.target.result); if (d.ledgerData !== undefined) { localStorage.setItem(getStoreKey('myLedgerData'), typeof d.ledgerData === 'string' ? d.ledgerData : JSON.stringify(d.ledgerData)); if(d.syncInfo) localStorage.setItem(getStoreKey('myLedgerSyncInfo'), d.syncInfo); if(d.customTags) localStorage.setItem(getStoreKey('myCustomTags'), d.customTags); if(d.customCategories) localStorage.setItem(getStoreKey('myCustomCategories'), d.customCategories); if(d.useTaiwanTime) localStorage.setItem('useTaiwanTime', d.useTaiwanTime); alert('✅ 匯入成功，系統將重整'); location.reload(); } else alert('❌ 無效備份檔'); } catch (err) { alert('❌ 解析失敗'); }
         e.target.value = '';
       }; reader.readAsText(file);
+    }
+    
+    // 🌟 新增：備份至 Google Drive (含手動與自動模式)
+    function backupToDrive(isAuto = false) {
+      const storedData = localStorage.getItem(getStoreKey('myLedgerData'));
+      if (!storedData || storedData === '[]') {
+        if (!isAuto) alert("沒有資料可以備份！");
+        return;
+      }
+      
+      const btn = document.getElementById('driveBackupBtn');
+      if (btn && !isAuto) { btn.innerText = "⏳ 雲端備份中..."; btn.disabled = true; }
+      
+      const payload = {
+        action: "auto_backup",
+        ledger: currentLedger,
+        data: {
+          ledgerData: JSON.parse(storedData),
+          syncInfo: localStorage.getItem(getStoreKey('myLedgerSyncInfo')) || '',
+          customTags: localStorage.getItem(getStoreKey('myCustomTags')) || '',
+          customCategories: localStorage.getItem(getStoreKey('myCustomCategories')) || ''
+        }
+      };
+      
+      fetch(apiUrl, { method: "POST", body: JSON.stringify(payload) })
+      .then(res => res.json())
+      .then(res => {
+        if (res.status === 'success') {
+          if (!isAuto) alert("✅ 已成功備份至您的 Google 雲端資料夾！");
+          console.log("雲端備份成功");
+        } else {
+          if (!isAuto) alert("❌ 備份失敗：" + res.message);
+        }
+      })
+      .catch(err => {
+        if (!isAuto) alert("❌ 連線錯誤，雲端備份失敗！");
+      })
+      .finally(() => {
+        if (btn && !isAuto) { btn.innerText = "☁️ 手動備份至 Google 雲端"; btn.disabled = false; }
+      });
     }
 
     window.onload = function() {
@@ -350,7 +398,7 @@
       if (tabName === 'chart') { populateChartSelectors(); renderChart(); }
     }
 
-    // ======== 同步與網路請求 ========
+    // ======== 🔄 同步與網路請求 ========
     function submitData() {
       const data = { action: "add", ledger: currentLedger, date: document.getElementById('dateInput').value, category: document.getElementById('categoryInput').value, item: document.getElementById('itemInput').value, amount: document.getElementById('amountInput').value };
       if (!data.item || !data.amount) return alert("請填妥資料！");
@@ -437,6 +485,9 @@
       alert(`✅ 同步完成！更新 ${finalData.length} 筆`);
       document.getElementById('syncStatus').style.color = "#007AFF"; 
       loadLocalData(); 
+      
+      // 🌟 同步完成後，自動執行背景雲端備份！
+      backupToDrive(true);
     }
 
     // ======== 🔍 搜尋引擎 (升級版：支援多關鍵字空白分隔、不打字不卡頓、載入更多) ========
@@ -526,8 +577,8 @@
 
     function openEditModal(itemStr) { const i = JSON.parse(decodeURIComponent(itemStr)); document.getElementById('editMonth').value = i.month; document.getElementById('editOldCategory').value = i.category; document.getElementById('editOldDetail').value = i.detail; document.getElementById('editOldAmount').value = i.amount; document.getElementById('editMonthDisplay').innerText = `📍 ${i.month}`; document.getElementById('editDetailInput').value = i.detail; document.getElementById('editAmountInput').value = i.amount; document.getElementById('editCategoryInput').innerHTML = (localStorage.getItem(getStoreKey('myCustomCategories'))||defaultCategories).split(',').filter(t=>t.trim()!=='').map(c => `<option value="${c}">${c}</option>`).join(''); document.getElementById('editCategoryInput').value = i.category; document.getElementById('editModal').style.display = 'flex'; }
     function closeEditModal() { document.getElementById('editModal').style.display = 'none'; }
-    function saveEditRecord() { const d = { action:'edit', ledger:currentLedger, month:document.getElementById('editMonth').value, oldCategory:document.getElementById('editOldCategory').value, oldDetail:document.getElementById('editOldDetail').value, oldAmount:document.getElementById('editOldAmount').value, newCategory:document.getElementById('editCategoryInput').value, newDetail:document.getElementById('editDetailInput').value, newAmount:document.getElementById('editAmountInput').value }; if(!d.newDetail||!d.newAmount) return alert("請填寫完整"); closeEditModal(); fetch(apiUrl, { method: "POST", body: JSON.stringify(d) }).then(res => res.json()).then(res => { if(res.status==='success') { let idx = localLedgerData.findIndex(item => item.month===d.month && item.category===d.oldCategory && item.detail===d.oldDetail && item.amount===d.oldAmount); if (idx!==-1) { localLedgerData[idx].category=d.newCategory; localLedgerData[idx].detail=d.newDetail; localLedgerData[idx].amount=d.newAmount; localStorage.setItem(getStoreKey('myLedgerData'), JSON.stringify(localLedgerData)); filterLocalData(); } alert("✅ 修改成功"); } }); }
-    function confirmDeleteFromEdit() { closeEditModal(); if(confirm("確定刪除此紀錄？")) { fetch(apiUrl, { method: "POST", body: JSON.stringify({ action: 'delete', ledger: currentLedger, month: document.getElementById('editMonth').value, category: document.getElementById('editOldCategory').value, detail: document.getElementById('editOldDetail').value, amount: document.getElementById('editOldAmount').value }) }).then(res => res.json()).then(res => { if(res.status==='success') { localLedgerData = localLedgerData.filter(i => !(i.month===document.getElementById('editMonth').value && i.detail===document.getElementById('editOldDetail').value)); localStorage.setItem(getStoreKey('myLedgerData'), JSON.stringify(localLedgerData)); filterLocalData(); alert("✅ 刪除成功"); } }); } }
+    function saveEditRecord() { const d = { action:'edit', ledger:currentLedger, month:document.getElementById('editMonth').value, oldCategory:document.getElementById('editOldCategory').value, oldDetail:document.getElementById('editOldDetail').value, oldAmount:document.getElementById('editOldAmount').value, newCategory:document.getElementById('editCategoryInput').value, newDetail:document.getElementById('editDetailInput').value, newAmount:document.getElementById('editAmountInput').value }; if(!d.newDetail||!d.newAmount) return alert("請填寫完整"); closeEditModal(); fetch(apiUrl, { method: "POST", body: JSON.stringify(d) }).then(res => res.json()).then(res => { if(res.status==='success') { let idx = localLedgerData.findIndex(item => item.month===d.month && item.category===d.oldCategory && item.detail===d.oldDetail && item.amount===d.oldAmount); if (idx!==-1) { localLedgerData[idx].category=d.newCategory; localLedgerData[idx].detail=d.newDetail; localLedgerData[idx].amount=d.newAmount; localStorage.setItem(getStoreKey('myLedgerData'), JSON.stringify(localLedgerData)); filterLocalData(); backupToDrive(true); } alert("✅ 修改成功"); } }); }
+    function confirmDeleteFromEdit() { closeEditModal(); if(confirm("確定刪除此紀錄？")) { fetch(apiUrl, { method: "POST", body: JSON.stringify({ action: 'delete', ledger: currentLedger, month: document.getElementById('editMonth').value, category: document.getElementById('editOldCategory').value, detail: document.getElementById('editOldDetail').value, amount: document.getElementById('editOldAmount').value }) }).then(res => res.json()).then(res => { if(res.status==='success') { localLedgerData = localLedgerData.filter(i => !(i.month===document.getElementById('editMonth').value && i.detail===document.getElementById('editOldDetail').value)); localStorage.setItem(getStoreKey('myLedgerData'), JSON.stringify(localLedgerData)); filterLocalData(); backupToDrive(true); alert("✅ 刪除成功"); } }); } }
 
     // ======== 分類標籤管理與計算機 ========
     let currentEditMode = ''; let tempEditingItems = []; 
@@ -552,7 +603,7 @@
     function confirmCalc() { if (/[+\-*/]/.test(calcExpression)) calcEval(); if (calcExpression !== '錯誤' && calcExpression !== '') document.getElementById(calcTargetInput).value = calcExpression; closeCalcModal(); }
     function updateCalcDisplay() { document.getElementById('calcDisplay').innerText = calcExpression || '0'; }
 
-    // ======== 📊 圖表智慧引擎 ========
+    // ======== 📊 圖表智慧引擎 (乾淨文字版) ========
     function setChartMode(mode) {
       chartMode = mode;
       document.querySelectorAll('.btn-mode').forEach(b => b.classList.remove('active'));
@@ -623,6 +674,7 @@
       }
 
       const rawData = localLedgerData.filter(i => targetMonths.includes(i.month));
+      // 🌟 徹底防護：將任何有「收入」兩個字的分類剔除於支出圖表之外
       const catData = rawData.filter(i => i.category !== "系統彙總" && i.category !== "收入" && !i.category.includes("收入"));
       const sumData = rawData.filter(i => i.category === "系統彙總");
 
