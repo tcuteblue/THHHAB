@@ -158,8 +158,8 @@
       <hr style="border: 0; height: 1px; background: #ddd; margin: 40px 0 20px 0;">
       
       <div style="background: #f8f9fa; padding: 15px; border-radius: 12px; border: 1px solid #eee;">
-        <label style="margin-top: 0; color: #007AFF; font-size: 18px;">🔄 雲端同步與更新</label>
-        <button class="sync-btn" style="background: #007AFF;" onclick="syncData('this_month')">📅 本月更新 (極速)</button>
+        <label style="margin-top: 0; color: #007AFF; font-size: 18px;">🔄 雲端同步</label>
+        <button class="sync-btn" style="background: #E02020;" onclick="syncData('this_month')">⚡ 本月同步</button>
 
         <div style="display: flex; gap: 10px; margin-top: 15px; align-items: center;">
           <select id="syncYearSelect" style="margin-top: 0; flex: 1; padding: 10px;"></select>
@@ -174,7 +174,7 @@
             <option value="11月">11月</option><option value="12月">12月</option>
           </select>
         </div>
-        <button class="sync-btn" style="background: #34C759; margin-top: 10px;" onclick="syncData('custom')">⚙ 抓取指定月份</button>
+        <button class="sync-btn" style="background: #34C759; margin-top: 10px;" onclick="syncData('custom')">⚙ 指定月份同步</button>
         <button class="sync-btn" style="background: #FF9500; margin-top: 15px;" onclick="syncData('all')">🔄 歷年完整同步</button>
         
         <div class="sync-status" id="syncStatus" style="font-size: 18px; font-weight: bold; margin-top: 15px; color: #007AFF; text-align: center;">尚未同步資料</div>
@@ -404,13 +404,13 @@
       if (!data.item || !data.amount) return alert("請填妥資料！");
       document.getElementById('syncStatus').innerText = "⏳ 正在儲存到雲端...";
       fetch(apiUrl, { method: "POST", body: JSON.stringify(data) }).then(res => res.json()).then(res => {
-        if (res.status === 'success') { alert("✅ 記帳成功！"); document.getElementById('itemInput').value = ''; document.getElementById('amountInput').value = ''; document.getElementById('dateInput').value = getTodayDateString(localStorage.getItem('useTaiwanTime') !== 'false'); document.getElementById('syncStatus').innerText = "⚠ 雲端有新資料，建議更新"; } else alert("❌ 錯誤：" + res.message);
+        if (res.status === 'success') { alert("✅ 記帳成功！"); document.getElementById('itemInput').value = ''; document.getElementById('amountInput').value = ''; document.getElementById('dateInput').value = getTodayDateString(localStorage.getItem('useTaiwanTime') !== 'false'); document.getElementById('syncStatus').innerText = "⚠ 雲端有新資料，建議同步"; } else alert("❌ 錯誤：" + res.message);
       });
     }
 
     function syncData(mode) {
       const currentTwYear = new Date().getFullYear() - 1911; let queue = [];
-      if (mode === 'this_month') { queue.push({ year: currentTwYear.toString(), month: (new Date().getMonth() + 1) + "月" }); document.getElementById('syncStatus').innerText = "🔄 更新本月中..."; } 
+      if (mode === 'this_month') { queue.push({ year: currentTwYear.toString(), month: (new Date().getMonth() + 1) + "月" }); document.getElementById('syncStatus').innerText = "🔄 本月同步中..."; } 
       else if (mode === 'custom') { let y = document.getElementById('syncYearSelect').value, m = document.getElementById('syncMonthSelect').value; if (m === "全部") { queue.push({ year: y, month: ["1月", "2月", "3月", "4月", "5月", "6月"] }); queue.push({ year: y, month: ["7月", "8月", "9月", "10月", "11月", "12月"] }); } else queue.push({ year: y, month: m }); } 
       else if (mode === 'all') { if(!confirm("確定完整同步？")) return; for (let y = currentTwYear; y >= 102; y--) { queue.push({ year: y.toString(), month: ["1月", "2月", "3月", "4月", "5月", "6月"] }); queue.push({ year: y.toString(), month: ["7月", "8月", "9月", "10月", "11月", "12月"] }); } }
       executeSyncQueue(queue, mode);
