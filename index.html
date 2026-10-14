@@ -183,16 +183,17 @@
       <div style="background: #f8f9fa; padding: 15px; border-radius: 12px; border: 1px solid #eee; margin-top: 20px;">
         <label style="margin-top: 0; color: #607D8B; font-size: 18px;">💾 本地與雲端資料備份</label>
         
-        <!-- 🌟 新增：手動雲端備份按鈕 -->
-        <button id="driveBackupBtn" style="background: #4285F4; margin-top: 10px; width: 100%; padding: 12px; font-size: 16px;" onclick="backupToDrive()">☁️ 手動備份至 Google 雲端</button>
+        <div style="display: flex; gap: 10px; margin-top: 10px;">
+          <button id="driveBackupBtn" style="background: #4285F4; margin-top: 0; flex: 1; padding: 12px; font-size: 16px;" onclick="backupToDrive()">☁️ 雲端備份</button>
+          <button id="driveRestoreBtn" style="background: #00BCD4; margin-top: 0; flex: 1; padding: 12px; font-size: 16px;" onclick="restoreFromDrive()">☁️ 雲端還原</button>
+        </div>
 
         <div style="display: flex; gap: 10px; margin-top: 10px;">
-          <button style="background: #607D8B; margin-top: 0; flex: 1; padding: 12px; font-size: 16px;" onclick="exportBackup()">📥 下載到手機</button>
-          <button style="background: #78909C; margin-top: 0; flex: 1; padding: 12px; font-size: 16px;" onclick="document.getElementById('importBackupInput').click()">📤 從手機匯入</button>
+          <button style="background: #607D8B; margin-top: 0; flex: 1; padding: 12px; font-size: 16px;" onclick="exportBackup()">📥 本機備份</button>
+          <button style="background: #78909C; margin-top: 0; flex: 1; padding: 12px; font-size: 16px;" onclick="document.getElementById('importBackupInput').click()">📤 本機還原</button>
         </div>
         <input type="file" id="importBackupInput" accept=".json" style="display: none;" onchange="importBackup(event)">
       </div>
-    </div>
 
     <!-- 🔍 查詢帳目 -->
     <div id="searchView" class="view-section">
@@ -375,10 +376,50 @@
         if (!isAuto) alert("❌ 連線錯誤，雲端備份失敗！");
       })
       .finally(() => {
-        if (btn && !isAuto) { btn.innerText = "☁️ 手動備份至 Google 雲端"; btn.disabled = false; }
+        if (btn && !isAuto) { btn.innerText = "☁️ 雲端備份"; btn.disabled = false; }
       });
     }
-
+    // 🌟 新增：從 Google Drive 雲端還原
+    function restoreFromDrive() {
+      if (!confirm(`⚠️ 雲端還原將會覆蓋您手機上目前的資料！\n\n確定要從 Google 雲端載入最新的備份檔嗎？`)) return;
+      
+      const btn = document.getElementById('driveRestoreBtn');
+      if (btn) { btn.innerText = "⏳ 雲端下載中..."; btn.disabled = true; }
+      
+      fetch(apiUrl, { 
+        method: "POST", 
+        body: JSON.stringify({ action: "restore_from_cloud", ledger: currentLedger }) 
+      })
+      .then(res => res.json())
+      .then(res => {
+        if (res.status === 'success') {
+          try {
+            const d = JSON.parse(res.data);
+            if (d.ledgerData !== undefined) {
+              localStorage.setItem(getStoreKey('myLedgerData'), typeof d.ledgerData === 'string' ? d.ledgerData : JSON.stringify(d.ledgerData));
+              if(d.syncInfo) localStorage.setItem(getStoreKey('myLedgerSyncInfo'), d.syncInfo);
+              if(d.customTags) localStorage.setItem(getStoreKey('myCustomTags'), d.customTags);
+              if(d.customCategories) localStorage.setItem(getStoreKey('myCustomCategories'), d.customCategories);
+              
+              alert('✅ 雲端還原成功！系統將重新載入。');
+              location.reload();
+            } else {
+              alert('❌ 還原失敗：雲端備份檔格式不符。');
+            }
+          } catch (e) {
+             alert('❌ 解析雲端資料失敗。');
+          }
+        } else {
+          alert("❌ 雲端還原失敗：" + res.message);
+        }
+      })
+      .catch(err => {
+        alert("❌ 連線錯誤，無法從雲端還原！");
+      })
+      .finally(() => {
+        if (btn) { btn.innerText = "☁️ 雲端還原"; btn.disabled = false; }
+      });
+    }
     window.onload = function() {
       initTimezone();
       const currentTwYear = new Date().getFullYear() - 1911;
