@@ -288,7 +288,7 @@
       let useTW = localStorage.getItem('useTaiwanTime') !== 'false';
       useTW = !useTW; localStorage.setItem('useTaiwanTime', useTW);
       updateTzUI(useTW); document.getElementById('dateInput').value = getTodayDateString(useTW);
-      exportBackup({ silent: true });
+      backupToDrive(true); // 設定變更，自動雲端備份
     }
     function updateTzUI(useTW) {
       const btn = document.getElementById('tzToggleBtn');
@@ -527,8 +527,7 @@
       document.getElementById('syncStatus').style.color = "#007AFF"; 
       loadLocalData(); 
       
-      // 🌟 同步完成後，自動執行背景雲端備份！
-      backupToDrive(true);
+      
     }
 
     // ======== 🔍 搜尋引擎 (升級版：支援多關鍵字空白分隔、不打字不卡頓、載入更多) ========
@@ -630,7 +629,7 @@
     function renderModalList() { document.getElementById('modalList').innerHTML = tempEditingItems.map((item, i) => `<div class="modal-list-item"><span>${item}</span><span class="delete-btn" onclick="removeModalItem(${i})">❌</span></div>`).join(''); }
     function removeModalItem(i) { tempEditingItems.splice(i, 1); renderModalList(); }
     function addModalItem() { const val = document.getElementById('modalNewInput').value.trim().replace(/,/g, ''); if (val) { tempEditingItems.push(val); document.getElementById('modalNewInput').value = ''; renderModalList(); } }
-    function saveSettingsModal() { localStorage.setItem(getStoreKey(currentEditMode === 'categories' ? 'myCustomCategories' : 'myCustomTags'), tempEditingItems.join(',')); currentEditMode === 'categories' ? loadCategories() : loadQuickTags(); closeSettingsModal(); exportBackup({ silent: true }); }
+    function saveSettingsModal() { localStorage.setItem(getStoreKey(currentEditMode === 'categories' ? 'myCustomCategories' : 'myCustomTags'), tempEditingItems.join(',')); currentEditMode === 'categories' ? loadCategories() : loadQuickTags(); closeSettingsModal(); backupToDrive(true); }
     function loadCategories() { const cats = (localStorage.getItem(getStoreKey('myCustomCategories')) || defaultCategories).split(',').filter(t=>t.trim()!==''); document.getElementById('categoryInput').innerHTML = cats.map(c => `<option value="${c}">${c}</option>`).join(''); }
     function loadQuickTags() { const tags = (localStorage.getItem(getStoreKey('myCustomTags')) || defaultTags).split(',').filter(t=>t.trim()!==''); document.getElementById('quickTagsContainer').innerHTML = tags.map(tag => `<span onclick="document.getElementById('itemInput').value='${tag} ';document.getElementById('itemInput').focus();">✨ ${tag}</span>`).join(''); }
     function updateDatalist() { if (!localLedgerData) return; const uniqueItems = new Set(); localLedgerData.filter(i=>i.category!=="系統彙總").forEach(item => { let cleanName = item.detail.trim().replace(/^(\d{2,3}\/)?\d{1,2}\/\d{1,2}\s*/, '').replace(/[\s\-$]*(NT\$?\vert{}\$)?\d+(?:\.\d+)?[元\s]*$/i, '').trim(); if (cleanName) uniqueItems.add(cleanName); }); document.getElementById('historySuggestions').innerHTML = Array.from(uniqueItems).map(v => `<option value="${v}">`).join(''); }
