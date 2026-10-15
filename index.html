@@ -194,6 +194,7 @@
         </div>
         <input type="file" id="importBackupInput" accept=".json" style="display: none;" onchange="importBackup(event)">
       </div>
+    </div>
 
     <!-- 🔍 查詢帳目 -->
     <div id="searchView" class="view-section">
@@ -340,7 +341,7 @@
       }; reader.readAsText(file);
     }
     
-    // 🌟 新增：備份至 Google Drive (含手動與自動模式)
+    // 🌟 備份至 Google Drive (含手動與自動模式)
     function backupToDrive(isAuto = false) {
       const storedData = localStorage.getItem(getStoreKey('myLedgerData'));
       if (!storedData || storedData === '[]') {
@@ -379,7 +380,8 @@
         if (btn && !isAuto) { btn.innerText = "☁️ 雲端備份"; btn.disabled = false; }
       });
     }
-    // 🌟 新增：從 Google Drive 雲端還原
+
+    // 🌟 從 Google Drive 雲端還原
     function restoreFromDrive() {
       if (!confirm(`⚠️ 雲端還原將會覆蓋您手機上目前的資料！\n\n確定要從 Google 雲端載入最新的備份檔嗎？`)) return;
       
@@ -420,6 +422,7 @@
         if (btn) { btn.innerText = "☁️ 雲端還原"; btn.disabled = false; }
       });
     }
+
     window.onload = function() {
       initTimezone();
       const currentTwYear = new Date().getFullYear() - 1911;
@@ -526,11 +529,9 @@
       alert(`✅ 同步完成！更新 ${finalData.length} 筆`);
       document.getElementById('syncStatus').style.color = "#007AFF"; 
       loadLocalData(); 
-      
-      
     }
 
-    // ======== 🔍 搜尋引擎 (升級版：支援多關鍵字空白分隔、不打字不卡頓、載入更多) ========
+    // ======== 🔍 搜尋引擎 ========
     let searchDisplayLimit = 100;
 
     function loadLocalData() {
@@ -540,12 +541,12 @@
     }
 
     function filterLocalData() {
-      searchDisplayLimit = 100; // 重新輸入字時，重置顯示筆數
+      searchDisplayLimit = 100; 
       renderSearchResults();
     }
 
     function loadMoreResults() {
-      searchDisplayLimit += 200; // 點擊按鈕多顯示 200 筆
+      searchDisplayLimit += 200; 
       renderSearchResults();
     }
 
@@ -553,19 +554,17 @@
       const keywordInput = document.getElementById('searchInput').value.trim().toLowerCase();
       const resultBox = document.getElementById('resultBox');
       
-      // 🌟 未輸入關鍵字時提示，不渲染任何資料，確保 12000 筆資料絕對不會造成畫面卡死
       if (!keywordInput) { 
         resultBox.innerHTML = '<div class="result-item" style="text-align:center; color:#888; background:transparent; border:none; box-shadow:none; font-size:16px;">👆 支援多關鍵字搜尋 (例：112年 晚餐)</div>'; 
         return; 
       }
 
-      // 🌟 支援用空白分隔多重關鍵字
       const keywords = keywordInput.split(/\s+/);
       let filtered = localLedgerData.filter(i => i.category !== "系統彙總"); 
       
       filtered = filtered.filter(i => {
         const combinedStr = `${i.month} ${i.category} ${i.detail} ${i.amount}`.toLowerCase();
-        return keywords.every(kw => combinedStr.includes(kw)); // 必須符合所有輸入的關鍵字
+        return keywords.every(kw => combinedStr.includes(kw)); 
       });
       
       filtered.sort((a, b) => {
@@ -587,7 +586,6 @@
             <div class="result-amount" style="text-align: right; pointer-events: none;">$ ${item.amount}</div></div>`;
         }).join('');
         
-        // 🌟 超過上限時顯示「載入更多」按鈕
         if (isOverLimit) {
           html += `<div style="text-align:center; padding: 10px 0 20px 0;">
                      <button onclick="loadMoreResults()" style="background:#f0f2f5; color:#007AFF; border:2px solid #007AFF; margin-top:0; padding:12px 25px; font-size:18px; font-weight:bold; border-radius:25px; width:auto; cursor:pointer;">
@@ -643,7 +641,7 @@
     function confirmCalc() { if (/[+\-*/]/.test(calcExpression)) calcEval(); if (calcExpression !== '錯誤' && calcExpression !== '') document.getElementById(calcTargetInput).value = calcExpression; closeCalcModal(); }
     function updateCalcDisplay() { document.getElementById('calcDisplay').innerText = calcExpression || '0'; }
 
-    // ======== 📊 圖表智慧引擎 (乾淨文字版) ========
+    // ======== 📊 圖表智慧引擎 ========
     function setChartMode(mode) {
       chartMode = mode;
       document.querySelectorAll('.btn-mode').forEach(b => b.classList.remove('active'));
@@ -714,7 +712,6 @@
       }
 
       const rawData = localLedgerData.filter(i => targetMonths.includes(i.month));
-      // 🌟 徹底防護：將任何有「收入」兩個字的分類剔除於支出圖表之外
       const catData = rawData.filter(i => i.category !== "系統彙總" && i.category !== "收入" && !i.category.includes("收入"));
       const sumData = rawData.filter(i => i.category === "系統彙總");
 
