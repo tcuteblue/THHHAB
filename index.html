@@ -341,12 +341,31 @@
       }; reader.readAsText(file);
     }
     
-    // 🌟 備份至 Google Drive (含手動與自動模式)
+        // 🌟 備份至 Google Drive (區分「手動完整」與「自動設定」)
     function backupToDrive(isAuto = false) {
-      const storedData = localStorage.getItem(getStoreKey('myLedgerData'));
-      if (!storedData || storedData === '[]') {
-        if (!isAuto) alert("沒有資料可以備份！");
-        return;
+      let backupData = {};
+      
+      if (!isAuto) {
+        // 【手動備份】：4樣全包 (本地帳本、時區、自訂分類、自訂標籤)
+        const storedData = localStorage.getItem(getStoreKey('myLedgerData'));
+        if (!storedData || storedData === '[]') {
+          alert("沒有帳本資料可以備份！");
+          return;
+        }
+        backupData = {
+          ledgerData: JSON.parse(storedData),
+          syncInfo: localStorage.getItem(getStoreKey('myLedgerSyncInfo')) || '',
+          customTags: localStorage.getItem(getStoreKey('myCustomTags')) || '',
+          customCategories: localStorage.getItem(getStoreKey('myCustomCategories')) || '',
+          useTaiwanTime: localStorage.getItem('useTaiwanTime') !== 'false' // 時區設定
+        };
+      } else {
+        // 【自動備份】：只要3樣 (時區、自訂分類、自訂標籤)
+        backupData = {
+          customTags: localStorage.getItem(getStoreKey('myCustomTags')) || '',
+          customCategories: localStorage.getItem(getStoreKey('myCustomCategories')) || '',
+          useTaiwanTime: localStorage.getItem('useTaiwanTime') !== 'false'
+        };
       }
       
       const btn = document.getElementById('driveBackupBtn');
@@ -355,12 +374,8 @@
       const payload = {
         action: "auto_backup",
         ledger: currentLedger,
-        data: {
-          ledgerData: JSON.parse(storedData),
-          syncInfo: localStorage.getItem(getStoreKey('myLedgerSyncInfo')) || '',
-          customTags: localStorage.getItem(getStoreKey('myCustomTags')) || '',
-          customCategories: localStorage.getItem(getStoreKey('myCustomCategories')) || ''
-        }
+        backupMode: isAuto ? "settings_only" : "full", // 讓 GAS 知道這是哪種備份
+        data: backupData
       };
       
       fetch(apiUrl, { method: "POST", body: JSON.stringify(payload) })
@@ -368,7 +383,7 @@
       .then(res => {
         if (res.status === 'success') {
           if (!isAuto) alert("✅ 已成功備份至您的 Google 雲端資料夾！");
-          console.log("雲端備份成功");
+          console.log(isAuto ? "自動備份(設定檔)成功" : "手動備份(完整)成功");
         } else {
           if (!isAuto) alert("❌ 備份失敗：" + res.message);
         }
@@ -380,6 +395,7 @@
         if (btn && !isAuto) { btn.innerText = "☁️ 雲端備份"; btn.disabled = false; }
       });
     }
+
 
     // 🌟 從 Google Drive 雲端還原
     function restoreFromDrive() {
@@ -615,8 +631,8 @@
 
     function openEditModal(itemStr) { const i = JSON.parse(decodeURIComponent(itemStr)); document.getElementById('editMonth').value = i.month; document.getElementById('editOldCategory').value = i.category; document.getElementById('editOldDetail').value = i.detail; document.getElementById('editOldAmount').value = i.amount; document.getElementById('editMonthDisplay').innerText = `📍 ${i.month}`; document.getElementById('editDetailInput').value = i.detail; document.getElementById('editAmountInput').value = i.amount; document.getElementById('editCategoryInput').innerHTML = (localStorage.getItem(getStoreKey('myCustomCategories'))||defaultCategories).split(',').filter(t=>t.trim()!=='').map(c => `<option value="${c}">${c}</option>`).join(''); document.getElementById('editCategoryInput').value = i.category; document.getElementById('editModal').style.display = 'flex'; }
     function closeEditModal() { document.getElementById('editModal').style.display = 'none'; }
-    function saveEditRecord() { const d = { action:'edit', ledger:currentLedger, month:document.getElementById('editMonth').value, oldCategory:document.getElementById('editOldCategory').value, oldDetail:document.getElementById('editOldDetail').value, oldAmount:document.getElementById('editOldAmount').value, newCategory:document.getElementById('editCategoryInput').value, newDetail:document.getElementById('editDetailInput').value, newAmount:document.getElementById('editAmountInput').value }; if(!d.newDetail||!d.newAmount) return alert("請填寫完整"); closeEditModal(); fetch(apiUrl, { method: "POST", body: JSON.stringify(d) }).then(res => res.json()).then(res => { if(res.status==='success') { let idx = localLedgerData.findIndex(item => item.month===d.month && item.category===d.oldCategory && item.detail===d.oldDetail && item.amount===d.oldAmount); if (idx!==-1) { localLedgerData[idx].category=d.newCategory; localLedgerData[idx].detail=d.newDetail; localLedgerData[idx].amount=d.newAmount; localStorage.setItem(getStoreKey('myLedgerData'), JSON.stringify(localLedgerData)); filterLocalData(); backupToDrive(true); } alert("✅ 修改成功"); } }); }
-    function confirmDeleteFromEdit() { closeEditModal(); if(confirm("確定刪除此紀錄？")) { fetch(apiUrl, { method: "POST", body: JSON.stringify({ action: 'delete', ledger: currentLedger, month: document.getElementById('editMonth').value, category: document.getElementById('editOldCategory').value, detail: document.getElementById('editOldDetail').value, amount: document.getElementById('editOldAmount').value }) }).then(res => res.json()).then(res => { if(res.status==='success') { localLedgerData = localLedgerData.filter(i => !(i.month===document.getElementById('editMonth').value && i.detail===document.getElementById('editOldDetail').value)); localStorage.setItem(getStoreKey('myLedgerData'), JSON.stringify(localLedgerData)); filterLocalData(); backupToDrive(true); alert("✅ 刪除成功"); } }); } }
+    function saveEditRecord() { const d = { action:'edit', ledger:currentLedger, month:document.getElementById('editMonth').value, oldCategory:document.getElementById('editOldCategory').value, oldDetail:document.getElementById('editOldDetail').value, oldAmount:document.getElementById('editOldAmount').value, newCategory:document.getElementById('editCategoryInput').value, newDetail:document.getElementById('editDetailInput').value, newAmount:document.getElementById('editAmountInput').value }; if(!d.newDetail||!d.newAmount) return alert("請填寫完整"); closeEditModal(); fetch(apiUrl, { method: "POST", body: JSON.stringify(d) }).then(res => res.json()).then(res => { if(res.status==='success') { let idx = localLedgerData.findIndex(item => item.month===d.month && item.category===d.oldCategory && item.detail===d.oldDetail && item.amount===d.oldAmount); if (idx!==-1) { localLedgerData[idx].category=d.newCategory; localLedgerData[idx].detail=d.newDetail; localLedgerData[idx].amount=d.newAmount; localStorage.setItem(getStoreKey('myLedgerData'), JSON.stringify(localLedgerData)); filterLocalData(); } alert("✅ 修改成功"); } }); }
+    function confirmDeleteFromEdit() { closeEditModal(); if(confirm("確定刪除此紀錄？")) { fetch(apiUrl, { method: "POST", body: JSON.stringify({ action: 'delete', ledger: currentLedger, month: document.getElementById('editMonth').value, category: document.getElementById('editOldCategory').value, detail: document.getElementById('editOldDetail').value, amount: document.getElementById('editOldAmount').value }) }).then(res => res.json()).then(res => { if(res.status==='success') { localLedgerData = localLedgerData.filter(i => !(i.month===document.getElementById('editMonth').value && i.detail===document.getElementById('editOldDetail').value)); localStorage.setItem(getStoreKey('myLedgerData'), JSON.stringify(localLedgerData)); filterLocalData();alert("✅ 刪除成功"); } }); } }
 
     // ======== 分類標籤管理與計算機 ========
     let currentEditMode = ''; let tempEditingItems = []; 
