@@ -330,16 +330,51 @@
       } catch (err) { if (!silent) alert('❌ 失敗：' + err.message); return false; }
     }
     
-    // 從手機匯入
+        // 從手機匯入 (智慧讀取版)
     function importBackup(e) {
       const file = e.target.files[0]; if (!file) return;
       if (!confirm(`⚠️ 這將覆蓋目前資料，確定匯入嗎？`)) { e.target.value = ''; return; }
       const reader = new FileReader();
       reader.onload = function(evt) {
-        try { const d = JSON.parse(evt.target.result); if (d.ledgerData !== undefined) { localStorage.setItem(getStoreKey('myLedgerData'), typeof d.ledgerData === 'string' ? d.ledgerData : JSON.stringify(d.ledgerData)); if(d.syncInfo) localStorage.setItem(getStoreKey('myLedgerSyncInfo'), d.syncInfo); if(d.customTags) localStorage.setItem(getStoreKey('myCustomTags'), d.customTags); if(d.customCategories) localStorage.setItem(getStoreKey('myCustomCategories'), d.customCategories); if(d.useTaiwanTime) localStorage.setItem('useTaiwanTime', d.useTaiwanTime); alert('✅ 匯入成功，系統將重整'); location.reload(); } else alert('❌ 無效備份檔'); } catch (err) { alert('❌ 解析失敗'); }
+        try { 
+          const d = JSON.parse(evt.target.result); 
+          let restoredItems = [];
+
+          // 逐一檢查 JSON 內有什麼，有就還原
+          if (d.ledgerData !== undefined) { 
+            localStorage.setItem(getStoreKey('myLedgerData'), typeof d.ledgerData === 'string' ? d.ledgerData : JSON.stringify(d.ledgerData)); 
+            restoredItems.push("帳本明細"); 
+          }
+          if (d.syncInfo !== undefined) { 
+            localStorage.setItem(getStoreKey('myLedgerSyncInfo'), d.syncInfo); 
+          }
+          if (d.customTags !== undefined) { 
+            localStorage.setItem(getStoreKey('myCustomTags'), d.customTags); 
+            restoredItems.push("自訂標籤"); 
+          }
+          if (d.customCategories !== undefined) { 
+            localStorage.setItem(getStoreKey('myCustomCategories'), d.customCategories); 
+            restoredItems.push("自訂分類"); 
+          }
+          if (d.useTaiwanTime !== undefined) { 
+            localStorage.setItem('useTaiwanTime', d.useTaiwanTime); 
+            restoredItems.push("時區設定"); 
+          }
+
+          if (restoredItems.length > 0) {
+            alert(`✅ 匯入成功！已還原：${restoredItems.join('、')}。\n系統將重新載入。`);
+            location.reload();
+          } else {
+            alert('❌ 匯入失敗：備份檔內無有效資料。');
+          }
+        } catch (err) { 
+          alert('❌ 解析失敗，檔案可能損毀'); 
+        }
         e.target.value = '';
-      }; reader.readAsText(file);
+      }; 
+      reader.readAsText(file);
     }
+
     
         // 🌟 備份至 Google Drive (區分「手動完整」與「自動設定」)
     function backupToDrive(isAuto = false) {
@@ -397,9 +432,9 @@
     }
 
 
-    // 🌟 從 Google Drive 雲端還原
+        // 🌟 從 Google Drive 雲端還原 (智慧讀取版)
     function restoreFromDrive() {
-      if (!confirm(`⚠️ 雲端還原將會覆蓋您手機上目前的資料！\n\n確定要從 Google 雲端載入最新的備份檔嗎？`)) return;
+      if (!confirm(`⚠️ 雲端還原將會覆蓋您手機上目前的設定或資料！\n\n確定要從 Google 雲端載入最新的備份檔嗎？`)) return;
       
       const btn = document.getElementById('driveRestoreBtn');
       if (btn) { btn.innerText = "⏳ 雲端下載中..."; btn.disabled = true; }
@@ -413,16 +448,34 @@
         if (res.status === 'success') {
           try {
             const d = JSON.parse(res.data);
-            if (d.ledgerData !== undefined) {
-              localStorage.setItem(getStoreKey('myLedgerData'), typeof d.ledgerData === 'string' ? d.ledgerData : JSON.stringify(d.ledgerData));
-              if(d.syncInfo) localStorage.setItem(getStoreKey('myLedgerSyncInfo'), d.syncInfo);
-              if(d.customTags) localStorage.setItem(getStoreKey('myCustomTags'), d.customTags);
-              if(d.customCategories) localStorage.setItem(getStoreKey('myCustomCategories'), d.customCategories);
-              
-              alert('✅ 雲端還原成功！系統將重新載入。');
+            let restoredItems = [];
+
+            // 逐一檢查 JSON 內有什麼，有就還原
+            if (d.ledgerData !== undefined) { 
+              localStorage.setItem(getStoreKey('myLedgerData'), typeof d.ledgerData === 'string' ? d.ledgerData : JSON.stringify(d.ledgerData)); 
+              restoredItems.push("帳本明細"); 
+            }
+            if (d.syncInfo !== undefined) { 
+              localStorage.setItem(getStoreKey('myLedgerSyncInfo'), d.syncInfo); 
+            }
+            if (d.customTags !== undefined) { 
+              localStorage.setItem(getStoreKey('myCustomTags'), d.customTags); 
+              restoredItems.push("自訂標籤"); 
+            }
+            if (d.customCategories !== undefined) { 
+              localStorage.setItem(getStoreKey('myCustomCategories'), d.customCategories); 
+              restoredItems.push("自訂分類"); 
+            }
+            if (d.useTaiwanTime !== undefined) { 
+              localStorage.setItem('useTaiwanTime', d.useTaiwanTime); 
+              restoredItems.push("時區設定"); 
+            }
+            
+            if (restoredItems.length > 0) {
+              alert(`✅ 雲端還原成功！已載入：${restoredItems.join('、')}。\n系統將重新載入。`);
               location.reload();
             } else {
-              alert('❌ 還原失敗：雲端備份檔格式不符。');
+              alert('❌ 還原失敗：雲端備份檔內無有效資料。');
             }
           } catch (e) {
              alert('❌ 解析雲端資料失敗。');
@@ -438,6 +491,7 @@
         if (btn) { btn.innerText = "☁️ 雲端還原"; btn.disabled = false; }
       });
     }
+
 
     window.onload = function() {
       initTimezone();
