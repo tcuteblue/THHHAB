@@ -376,8 +376,31 @@
     }
 
     
-        // 🌟 備份至 Google Drive (區分「手動完整」與「自動設定」)
+        // ======== 💾 本地與雲端備份系統 ========
+    
+    // 🌟 全域變數：用來存放防抖的倒數計時器
+    let autoBackupTimer = null;
+
+    // 🌟 防抖指揮官：負責判斷要不要等待
     function backupToDrive(isAuto = false) {
+      if (isAuto) {
+        // 【自動備份】啟用防抖：如果 3 秒內連續觸發，先取消前一次的倒數
+        if (autoBackupTimer) clearTimeout(autoBackupTimer);
+        
+        // 重新開始倒數 3 秒 (3000毫秒)，3 秒後才真正執行上傳
+        console.log("⏱️ 已觸發自動備份，等待 3 秒無動作後執行...");
+        autoBackupTimer = setTimeout(() => {
+          executeDriveBackup(true);
+        }, 3000);
+      } else {
+        // 【手動備份】立刻執行：且若剛好有自動備份在倒數，直接取消掉避免重複送出
+        if (autoBackupTimer) clearTimeout(autoBackupTimer);
+        executeDriveBackup(false);
+      }
+    }
+
+    // 🌟 實際執行的苦力：原汁原味的備份邏輯
+    function executeDriveBackup(isAuto) {
       let backupData = {};
       
       if (!isAuto) {
@@ -418,7 +441,7 @@
       .then(res => {
         if (res.status === 'success') {
           if (!isAuto) alert("✅ 已成功備份至您的 Google 雲端資料夾！");
-          console.log(isAuto ? "自動備份(設定檔)成功" : "手動備份(完整)成功");
+          console.log(isAuto ? "✅ 自動備份(設定檔)成功" : "✅ 手動備份(完整)成功");
         } else {
           if (!isAuto) alert("❌ 備份失敗：" + res.message);
         }
