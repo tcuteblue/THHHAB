@@ -514,13 +514,47 @@
 
     // ======== 🔄 同步與網路請求 ========
     function submitData() {
-      const data = { action: "add", ledger: currentLedger, date: document.getElementById('dateInput').value, category: document.getElementById('categoryInput').value, item: document.getElementById('itemInput').value, amount: document.getElementById('amountInput').value };
-      if (!data.item || !data.amount) return alert("請填妥資料！");
-      document.getElementById('syncStatus').innerText = "⏳ 正在儲存到雲端...";
-      fetch(apiUrl, { method: "POST", body: JSON.stringify(data) }).then(res => res.json()).then(res => {
-        if (res.status === 'success') { alert("✅ 記帳成功！"); document.getElementById('itemInput').value = ''; document.getElementById('amountInput').value = ''; document.getElementById('dateInput').value = getTodayDateString(localStorage.getItem('useTaiwanTime') !== 'false'); document.getElementById('syncStatus').innerText = "⚠ 雲端有新資料，建議同步"; } else alert("❌ 錯誤：" + res.message);
-      });
+  const data = { action: "add", ledger: currentLedger, date: document.getElementById('dateInput').value, category: document.getElementById('categoryInput').value, item: document.getElementById('itemInput').value, amount: document.getElementById('amountInput').value };
+  if (!data.item || !data.amount) return alert("請填妥資料！");
+  
+  const statusEl = document.getElementById('syncStatus');
+  statusEl.innerText = "⏳ 正在儲存到雲端...";
+  
+  // 避免使用者狂按導致重複記帳：暫時將按鈕反白禁用
+  const btn = document.querySelector("#addView button[onclick='submitData()']");
+  if(btn) { btn.disabled = true; btn.innerText = "⏳ 傳送中..."; btn.style.opacity = "0.7"; }
+
+  fetch(apiUrl, { method: "POST", body: JSON.stringify(data) })
+  .then(res => res.text()) // 關鍵：先轉成純文字，防止 Google 偶爾回傳錯誤網頁導致解析崩潰
+  .then(text => {
+    try {
+      let res = JSON.parse(text);
+      if (res.status === 'success') { 
+        alert("✅ 記帳成功！"); 
+        document.getElementById('itemInput').value = ''; 
+        document.getElementById('amountInput').value = ''; 
+        document.getElementById('dateInput').value = getTodayDateString(localStorage.getItem('useTaiwanTime') !== 'false'); 
+        statusEl.innerText = "⚠ 雲端有新資料，建議同步"; 
+      } else {
+        alert("❌ 錯誤：" + res.message);
+        statusEl.innerText = "❌ 記帳失敗";
+      }
+    } catch(e) {
+      // 當 Google 已經把資料寫進去，但回傳逾時或格式錯誤時，就會觸發這裡
+      alert("⚠️ 伺服器回傳較慢，但資料【極可能已成功寫入雲端】！\n為了避免重複記帳，請稍後點擊同步來確認。");
+      statusEl.innerText = "⚠️ 回傳異常，建議同步確認";
     }
+  })
+  .catch(err => {
+    // 發生在網路瞬間閃斷時
+    alert("📡 手機網路連線不穩！但資料可能已經送達。\n請稍後點擊同步確認，不要急著重複輸入喔！");
+    statusEl.innerText = "⚠️ 網路不穩";
+  })
+  .finally(() => {
+    // 不管成功或失敗，最後一定要把按鈕恢復原狀
+    if(btn) { btn.disabled = false; btn.innerText = "新增帳目"; btn.style.opacity = "1"; }
+  });
+}
 
     function syncData(mode) {
       const currentTwYear = new Date().getFullYear() - 1911; let queue = [];
