@@ -79,7 +79,17 @@
     .result-amount { font-weight: bold; color: #E02020; font-size: 22px; margin-top: 8px; }
     .result-category { font-size: 14px; color: white; background: #34A853; padding: 2px 8px; border-radius: 12px; margin-right: 8px; display: inline-block; }
     .result-month { font-size: 16px; color: #888; margin-bottom: 6px; }
-    
+
+    .account-mode-tabs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-bottom: 18px; }
+    .account-mode-btn { margin: 0; padding: 11px 7px; font-size: 15px; background: #eef1f5; color: #4b5563; border: 1px solid #dce1e8; }
+    .account-mode-btn.active { background: #007AFF; color: #fff; border-color: #007AFF; }
+    .record-filter-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+    .record-filter-grid .filter-category { grid-column: 1 / -1; }
+    .record-filter-grid label { margin-top: 8px; font-size: 16px; }
+    .record-filter-grid select { font-size: 17px; padding: 12px 10px; }
+    .filter-hint { color: #6b7280; font-size: 14px; line-height: 1.5; margin: 6px 0 12px; }
+    .filtered-summary { display: none; margin-top: 14px; padding: 12px; border-radius: 8px; background: #eef5ff; color: #1756a9; font-weight: bold; line-height: 1.5; white-space: pre-line; }
+
     .multi-select-bar { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: rgba(30, 30, 30, 0.95); backdrop-filter: blur(10px); color: white; padding: 15px 25px; border-radius: 30px; box-shadow: 0 8px 20px rgba(0,0,0,0.3); z-index: 2000; display: none; justify-content: space-between; align-items: center; width: 85%; max-width: 400px; animation: slideUp 0.3s ease-out; font-size: 18px; }
     @keyframes slideUp { from { bottom: -50px; opacity: 0; } to { bottom: 20px; opacity: 1; } }
     .multi-select-bar button { margin: 0; padding: 8px 15px; font-size: 16px; background: rgba(255,255,255,0.2); width: auto; }
@@ -158,9 +168,43 @@
 
     <!-- 🔍 帳目查詢與管理 -->
     <div id="searchView" class="view-section">
-      <label style="margin-top: 0;">🔍 萬用搜尋 (支援空白分隔多關鍵字)</label>
-      <input type="text" id="searchInput" placeholder="例：112年 晚餐..." oninput="filterLocalData()">
-      <div class="result-box" id="resultBox"></div>
+      <div class="account-mode-tabs" role="tablist" aria-label="帳目檢視方式">
+        <button type="button" id="keywordModeBtn" class="account-mode-btn active" role="tab" aria-selected="true" onclick="switchAccountMode('keyword')">🔎 關鍵字搜尋</button>
+        <button type="button" id="periodModeBtn" class="account-mode-btn" role="tab" aria-selected="false" onclick="switchAccountMode('period')">📅 年月分類檢視</button>
+      </div>
+
+      <div id="keywordSearchPanel">
+        <label style="margin-top: 0;">🔍 萬用搜尋 (支援空白分隔多關鍵字)</label>
+        <input type="text" id="searchInput" placeholder="例：112年 晚餐..." oninput="filterLocalData()">
+        <div class="result-box" id="resultBox"></div>
+      </div>
+
+      <div id="periodSearchPanel" style="display:none;">
+        <h3 style="margin: 0 0 6px; font-size: 20px;">📅 依年月與分類檢視</h3>
+        <p class="filter-hint">選擇年度、月份與記帳分類，即可列出符合條件的所有明細。這裡顯示的是本機已同步的資料；若剛新增的帳目尚未出現，請先到「設定」執行同步。</p>
+        <div class="record-filter-grid">
+          <div>
+            <label for="recordFilterYear" style="margin-top:0;">年度</label>
+            <select id="recordFilterYear"></select>
+          </div>
+          <div>
+            <label for="recordFilterMonth" style="margin-top:0;">月份</label>
+            <select id="recordFilterMonth">
+              <option value="1">1月</option><option value="2">2月</option><option value="3">3月</option>
+              <option value="4">4月</option><option value="5">5月</option><option value="6">6月</option>
+              <option value="7">7月</option><option value="8">8月</option><option value="9">9月</option>
+              <option value="10">10月</option><option value="11">11月</option><option value="12">12月</option>
+            </select>
+          </div>
+          <div class="filter-category">
+            <label for="recordFilterCategory" style="margin-top:0;">記帳分類</label>
+            <select id="recordFilterCategory"></select>
+          </div>
+        </div>
+        <button type="button" class="settings-action" style="margin-top:14px;" onclick="renderFilteredRecords(true)">顯示明細</button>
+        <div id="filteredResultSummary" class="filtered-summary"></div>
+        <div class="result-box" id="filteredResultBox"></div>
+      </div>
     </div> 
 
     <!-- 📊 圖表分析 -->
@@ -213,7 +257,7 @@
       <div class="setting-group">
         <label class="setting-title">🔄 雲端資料同步</label>
         <p class="setting-description">同步會將雲端帳目載入本機，供帳目查詢及圖表分析使用；這和備份是不同的功能。</p>
-        <button class="sync-btn" style="background: #2478D4; margin-top: 0;" onclick="syncData('this_month')">📅 同步本月帳目</button>
+        <button class="sync-btn" style="background: #2478D4; margin-top: 0;" onclick="syncData('this_month')">⚡ 本月極速同步</button>
         <div style="display: flex; gap: 10px; margin-top: 15px; align-items: center;">
           <select id="syncYearSelect" aria-label="同步年度" style="margin-top: 0; flex: 1; padding: 10px;"></select>
           <span style="font-weight: bold; color: #555;">年</span>
@@ -403,7 +447,14 @@
       const silent = options.silent === true;
       if (!silent && !confirm(`確定下載備份檔嗎？`)) return false;
       try {
-        const json = JSON.stringify({ ledgerData: localStorage.getItem(getStoreKey('myLedgerData')) || '[]', syncInfo: localStorage.getItem(getStoreKey('myLedgerSyncInfo')) || '', customTags: localStorage.getItem(getStoreKey('myCustomTags')), customCategories: localStorage.getItem(getStoreKey('myCustomCategories')), useTaiwanTime: localStorage.getItem('useTaiwanTime') });
+        const json = JSON.stringify({
+          ledgerData: localStorage.getItem(getStoreKey('myLedgerData')) || '[]',
+          syncInfo: localStorage.getItem(getStoreKey('myLedgerSyncInfo')) || '',
+          customTags: localStorage.getItem(getStoreKey('myCustomTags')),
+          customCategories: localStorage.getItem(getStoreKey('myCustomCategories')),
+          // 將有效時區設定明確寫入備份；未曾設定時，預設為台灣時間。
+          useTaiwanTime: localStorage.getItem('useTaiwanTime') === 'false' ? 'false' : 'true'
+        });
         const now = new Date(); const timeStamp = `${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}_${String(now.getHours()).padStart(2,'0')}${String(now.getMinutes()).padStart(2,'0')}`;
         const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([json], { type: 'application/json' })); a.download = `${currentLedger === 'home' ? '家用雲帳本' : '工作室帳本'}_${timeStamp}.json`;
         a.click(); if (!silent) alert('✅ 本地備份成功！'); return true;
@@ -416,7 +467,20 @@
       if (!confirm(`⚠️ 這將覆蓋目前資料，確定匯入嗎？`)) { e.target.value = ''; return; }
       const reader = new FileReader();
       reader.onload = function(evt) {
-        try { const d = JSON.parse(evt.target.result); if (d.ledgerData !== undefined) { localStorage.setItem(getStoreKey('myLedgerData'), typeof d.ledgerData === 'string' ? d.ledgerData : JSON.stringify(d.ledgerData)); if(d.syncInfo) localStorage.setItem(getStoreKey('myLedgerSyncInfo'), d.syncInfo); if(d.customTags) localStorage.setItem(getStoreKey('myCustomTags'), d.customTags); if(d.customCategories) localStorage.setItem(getStoreKey('myCustomCategories'), d.customCategories); if(d.useTaiwanTime) localStorage.setItem('useTaiwanTime', d.useTaiwanTime); alert('✅ 匯入成功，系統將重整'); location.reload(); } else alert('❌ 無效備份檔'); } catch (err) { alert('❌ 解析失敗'); }
+        try {
+          const d = JSON.parse(evt.target.result);
+          if (d.ledgerData !== undefined) {
+            localStorage.setItem(getStoreKey('myLedgerData'), typeof d.ledgerData === 'string' ? d.ledgerData : JSON.stringify(d.ledgerData));
+            if (d.syncInfo !== undefined && d.syncInfo !== null) localStorage.setItem(getStoreKey('myLedgerSyncInfo'), d.syncInfo);
+            if (d.customTags !== undefined && d.customTags !== null) localStorage.setItem(getStoreKey('myCustomTags'), d.customTags);
+            if (d.customCategories !== undefined && d.customCategories !== null) localStorage.setItem(getStoreKey('myCustomCategories'), d.customCategories);
+            if (d.useTaiwanTime !== undefined && d.useTaiwanTime !== null) {
+              const useTW = !(d.useTaiwanTime === false || d.useTaiwanTime === 'false');
+              localStorage.setItem('useTaiwanTime', String(useTW));
+            }
+            alert('✅ 匯入成功，系統將重整'); location.reload();
+          } else alert('❌ 無效備份檔');
+        } catch (err) { alert('❌ 解析失敗'); }
         e.target.value = '';
       }; reader.readAsText(file);
     }
@@ -439,7 +503,9 @@
           ledgerData: JSON.parse(storedData),
           syncInfo: localStorage.getItem(getStoreKey('myLedgerSyncInfo')) || '',
           customTags: localStorage.getItem(getStoreKey('myCustomTags')) || '',
-          customCategories: localStorage.getItem(getStoreKey('myCustomCategories')) || ''
+          customCategories: localStorage.getItem(getStoreKey('myCustomCategories')) || '',
+          // 自動與手動雲端備份共用此 payload，因此兩者都會保存時區設定。
+          useTaiwanTime: localStorage.getItem('useTaiwanTime') === 'false' ? 'false' : 'true'
         }
       };
       
@@ -479,9 +545,13 @@
             const d = JSON.parse(res.data);
             if (d.ledgerData !== undefined) {
               localStorage.setItem(getStoreKey('myLedgerData'), typeof d.ledgerData === 'string' ? d.ledgerData : JSON.stringify(d.ledgerData));
-              if(d.syncInfo) localStorage.setItem(getStoreKey('myLedgerSyncInfo'), d.syncInfo);
-              if(d.customTags) localStorage.setItem(getStoreKey('myCustomTags'), d.customTags);
-              if(d.customCategories) localStorage.setItem(getStoreKey('myCustomCategories'), d.customCategories);
+              if (d.syncInfo !== undefined && d.syncInfo !== null) localStorage.setItem(getStoreKey('myLedgerSyncInfo'), d.syncInfo);
+              if (d.customTags !== undefined && d.customTags !== null) localStorage.setItem(getStoreKey('myCustomTags'), d.customTags);
+              if (d.customCategories !== undefined && d.customCategories !== null) localStorage.setItem(getStoreKey('myCustomCategories'), d.customCategories);
+              if (d.useTaiwanTime !== undefined && d.useTaiwanTime !== null) {
+                const useTW = !(d.useTaiwanTime === false || d.useTaiwanTime === 'false');
+                localStorage.setItem('useTaiwanTime', String(useTW));
+              }
               
               alert('✅ 雲端還原成功！系統將重新載入。');
               location.reload();
@@ -528,6 +598,117 @@
       if (targetView) targetView.classList.add('active');
       if (tabName === 'search') loadLocalData();
       if (tabName === 'chart') { populateChartSelectors(); renderChart(); }
+    }
+
+    // ======== 帳目分頁：關鍵字搜尋 / 年月分類檢視 ========
+    let recordFilterHasRun = false;
+
+    function switchAccountMode(mode) {
+      const isKeyword = mode === 'keyword';
+      document.getElementById('keywordSearchPanel').style.display = isKeyword ? 'block' : 'none';
+      document.getElementById('periodSearchPanel').style.display = isKeyword ? 'none' : 'block';
+      document.getElementById('keywordModeBtn').classList.toggle('active', isKeyword);
+      document.getElementById('periodModeBtn').classList.toggle('active', !isKeyword);
+      document.getElementById('keywordModeBtn').setAttribute('aria-selected', isKeyword ? 'true' : 'false');
+      document.getElementById('periodModeBtn').setAttribute('aria-selected', isKeyword ? 'false' : 'true');
+      if (!isKeyword) {
+        populateRecordFilterSelectors();
+        if (recordFilterHasRun) renderFilteredRecords(false);
+      }
+    }
+
+    function populateRecordFilterSelectors() {
+      const yearSelect = document.getElementById('recordFilterYear');
+      const monthSelect = document.getElementById('recordFilterMonth');
+      const categorySelect = document.getElementById('recordFilterCategory');
+      if (!yearSelect || !monthSelect || !categorySelect) return;
+
+      const currentTwYear = new Date().getFullYear() - 1911;
+      const previousYear = yearSelect.value;
+      const previousMonth = monthSelect.value;
+      const previousCategory = categorySelect.value;
+      const years = new Set([currentTwYear]);
+      (localLedgerData || []).forEach(item => {
+        const match = String(item.month || '').match(/(\d+)年/);
+        if (match) years.add(Number(match[1]));
+      });
+      const sortedYears = Array.from(years).sort((a, b) => b - a);
+      yearSelect.innerHTML = '';
+      sortedYears.forEach(year => yearSelect.add(new Option(`${year}年`, String(year))));
+      yearSelect.value = sortedYears.map(String).includes(previousYear) ? previousYear : String(currentTwYear);
+      if (!yearSelect.value && sortedYears.length) yearSelect.value = String(sortedYears[0]);
+
+      const month = String(previousMonth || (new Date().getMonth() + 1));
+      monthSelect.value = month;
+
+      const categorySet = new Set();
+      const savedCategories = localStorage.getItem(getStoreKey('myCustomCategories')) || defaultCategories;
+      savedCategories.split(',').map(value => value.trim()).filter(Boolean).forEach(value => categorySet.add(value));
+      (localLedgerData || []).forEach(item => {
+        const category = String(item.category || '').trim();
+        if (category && category !== '系統彙總') categorySet.add(category);
+      });
+      const categories = Array.from(categorySet);
+      categorySelect.innerHTML = '';
+      categorySelect.add(new Option('全部分類', '__ALL__'));
+      categories.forEach(category => categorySelect.add(new Option(category, category)));
+      categorySelect.value = categories.includes(previousCategory) || previousCategory === '__ALL__' ? previousCategory : '__ALL__';
+    }
+
+    function getRecordSortValue(item) {
+      let match = String(item.detail || '').match(/^(\d{2,3})\/(\d{1,2})\/(\d{1,2})/);
+      if (match) return Number(match[1]) * 10000 + Number(match[2]) * 100 + Number(match[3]);
+      match = String(item.month || '').match(/(\d+)年\s*(\d+)月/);
+      return match ? Number(match[1]) * 10000 + Number(match[2]) * 100 : 0;
+    }
+
+    function escapeHtml(value) {
+      return String(value == null ? '' : value).replace(/[&<>"']/g, char => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+      }[char]));
+    }
+
+    function renderFilteredRecords(runByUser = true) {
+      if (runByUser) recordFilterHasRun = true;
+      const resultBox = document.getElementById('filteredResultBox');
+      const summary = document.getElementById('filteredResultSummary');
+      const year = document.getElementById('recordFilterYear').value;
+      const month = document.getElementById('recordFilterMonth').value;
+      const category = document.getElementById('recordFilterCategory').value;
+      const monthKey = `${year}年 ${Number(month)}月`;
+
+      if (!localLedgerData || localLedgerData.length === 0) {
+        summary.style.display = 'block';
+        summary.innerText = '目前沒有本機帳目資料，請先到「設定」執行雲端同步。';
+        resultBox.innerHTML = '';
+        return;
+      }
+
+      let filtered = localLedgerData.filter(item => {
+        if (!item || item.category === '系統彙總' || String(item.month || '') !== monthKey) return false;
+        return category === '__ALL__' || String(item.category || '') === category;
+      });
+      filtered.sort((a, b) => getRecordSortValue(b) - getRecordSortValue(a));
+      const totalAmount = filtered.reduce((sum, item) => sum + (parseFloat(String(item.amount == null ? '0' : item.amount).replace(/,/g, '')) || 0), 0);
+      const categoryLabel = category === '__ALL__' ? '全部分類' : category;
+      summary.style.display = 'block';
+      summary.innerText = `${monthKey}｜${categoryLabel}\n共 ${filtered.length} 筆明細｜明細金額合計 $ ${totalAmount.toLocaleString()}`;
+
+      if (filtered.length === 0) {
+        resultBox.innerHTML = '<div class="result-item" style="text-align:center; color:#777;">這個年月與分類沒有找到明細。</div>';
+        return;
+      }
+
+      resultBox.innerHTML = filtered.map(item => {
+        const categoryHtml = item.category ? `<span class="result-category">${escapeHtml(item.category)}</span>` : '';
+        const detail = escapeHtml(item.detail || '（沒有項目說明）');
+        const monthText = escapeHtml(item.month || '');
+        const amount = escapeHtml(item.amount == null ? '0' : item.amount);
+        return `<div class="result-item" style="display:flex; justify-content:space-between; align-items:flex-start; gap:10px;">
+          <div style="flex:1; min-width:0;"><div class="result-month">📍 ${monthText}</div><div style="font-size:17px; line-height:1.5; overflow-wrap:anywhere;">${categoryHtml} ${detail}</div></div>
+          <div class="result-amount" style="text-align:right; flex-shrink:0; margin-top:0;">$ ${amount}</div>
+        </div>`;
+      }).join('');
     }
 
     // ======== 🔄 同步與網路請求 ========
@@ -623,9 +804,21 @@
     let searchDisplayLimit = 100;
 
     function loadLocalData() {
-      const stored = localStorage.getItem(getStoreKey('myLedgerData')); const info = localStorage.getItem(getStoreKey('myLedgerSyncInfo'));
-      if (stored && info) { localLedgerData = JSON.parse(stored); document.getElementById('syncStatus').innerText = info; updateDatalist(); filterLocalData(); } 
-      else { localLedgerData = []; document.getElementById('syncStatus').innerText = "尚未同步資料"; document.getElementById('resultBox').innerHTML = ''; }
+      const stored = localStorage.getItem(getStoreKey('myLedgerData'));
+      const info = localStorage.getItem(getStoreKey('myLedgerSyncInfo'));
+      if (stored && info) {
+        try { localLedgerData = JSON.parse(stored); if (!Array.isArray(localLedgerData)) localLedgerData = []; }
+        catch (err) { localLedgerData = []; }
+        document.getElementById('syncStatus').innerText = info;
+        updateDatalist();
+        filterLocalData();
+      } else {
+        localLedgerData = [];
+        document.getElementById('syncStatus').innerText = "尚未同步資料";
+        document.getElementById('resultBox').innerHTML = '';
+      }
+      populateRecordFilterSelectors();
+      if (recordFilterHasRun) renderFilteredRecords(false);
     }
 
     function filterLocalData() {
@@ -704,7 +897,39 @@
     function openEditModal(itemStr) { const i = JSON.parse(decodeURIComponent(itemStr)); document.getElementById('editMonth').value = i.month; document.getElementById('editOldCategory').value = i.category; document.getElementById('editOldDetail').value = i.detail; document.getElementById('editOldAmount').value = i.amount; document.getElementById('editMonthDisplay').innerText = `📍 ${i.month}`; document.getElementById('editDetailInput').value = i.detail; document.getElementById('editAmountInput').value = i.amount; document.getElementById('editCategoryInput').innerHTML = (localStorage.getItem(getStoreKey('myCustomCategories'))||defaultCategories).split(',').filter(t=>t.trim()!=='').map(c => `<option value="${c}">${c}</option>`).join(''); document.getElementById('editCategoryInput').value = i.category; document.getElementById('editModal').style.display = 'flex'; }
     function closeEditModal() { document.getElementById('editModal').style.display = 'none'; }
     function saveEditRecord() { const d = { action:'edit', ledger:currentLedger, month:document.getElementById('editMonth').value, oldCategory:document.getElementById('editOldCategory').value, oldDetail:document.getElementById('editOldDetail').value, oldAmount:document.getElementById('editOldAmount').value, newCategory:document.getElementById('editCategoryInput').value, newDetail:document.getElementById('editDetailInput').value, newAmount:document.getElementById('editAmountInput').value }; if(!d.newDetail||!d.newAmount) return alert("請填寫完整"); closeEditModal(); fetch(apiUrl, { method: "POST", body: JSON.stringify(d) }).then(res => res.json()).then(res => { if(res.status==='success') { let idx = localLedgerData.findIndex(item => item.month===d.month && item.category===d.oldCategory && item.detail===d.oldDetail && item.amount===d.oldAmount); if (idx!==-1) { localLedgerData[idx].category=d.newCategory; localLedgerData[idx].detail=d.newDetail; localLedgerData[idx].amount=d.newAmount; localStorage.setItem(getStoreKey('myLedgerData'), JSON.stringify(localLedgerData)); filterLocalData(); backupToDrive(true); } alert("✅ 修改成功"); } }); }
-    function confirmDeleteFromEdit() { closeEditModal(); if(confirm("確定刪除此紀錄？")) { fetch(apiUrl, { method: "POST", body: JSON.stringify({ action: 'delete', ledger: currentLedger, month: document.getElementById('editMonth').value, category: document.getElementById('editOldCategory').value, detail: document.getElementById('editOldDetail').value, amount: document.getElementById('editOldAmount').value }) }).then(res => res.json()).then(res => { if(res.status==='success') { localLedgerData = localLedgerData.filter(i => !(i.month===document.getElementById('editMonth').value && i.detail===document.getElementById('editOldDetail').value)); localStorage.setItem(getStoreKey('myLedgerData'), JSON.stringify(localLedgerData)); filterLocalData(); backupToDrive(true); alert("✅ 刪除成功"); } }); } }
+    function confirmDeleteFromEdit() {
+      const d = {
+        action: 'delete', ledger: currentLedger,
+        month: document.getElementById('editMonth').value,
+        category: document.getElementById('editOldCategory').value,
+        detail: document.getElementById('editOldDetail').value,
+        amount: document.getElementById('editOldAmount').value
+      };
+      closeEditModal();
+      if (!confirm("確定刪除此紀錄？")) return;
+      fetch(apiUrl, { method: "POST", body: JSON.stringify(d) })
+        .then(res => res.json())
+        .then(res => {
+          if (res.status === 'success') {
+            // 不使用 filter 一次移除所有同名項目；只移除第一筆完全符合條件的本機紀錄。
+            const idx = localLedgerData.findIndex(item =>
+              String(item.month || '') === String(d.month) &&
+              String(item.category || '') === String(d.category) &&
+              String(item.detail || '') === String(d.detail) &&
+              String(item.amount == null ? '' : item.amount) === String(d.amount)
+            );
+            if (idx !== -1) localLedgerData.splice(idx, 1);
+            localStorage.setItem(getStoreKey('myLedgerData'), JSON.stringify(localLedgerData));
+            filterLocalData();
+            if (recordFilterHasRun) renderFilteredRecords(false);
+            backupToDrive(true);
+            alert("✅ 刪除成功");
+          } else {
+            alert("❌ 刪除失敗：" + (res.message || '雲端未能刪除紀錄'));
+          }
+        })
+        .catch(() => alert("❌ 連線錯誤，刪除失敗。"));
+    }
 
     // ======== 分類標籤管理與計算機 ========
     let currentEditMode = ''; let tempEditingItems = []; 
