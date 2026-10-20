@@ -13,36 +13,31 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
   <script>
-    let baseUrl = window.location.href.split('?')[0].replace(/index\.html$/, '');
-    if (!baseUrl.endsWith('/')) baseUrl += '/';
-    const absoluteIconUrl = new URL('icon.ico', baseUrl).href;
-    const startUrl = new URL('./index.html', baseUrl).href;
-
+    // 單檔 PWA：Manifest 以 Blob 動態產生，圖示以內嵌 SVG 提供。
+    // 注意：瀏覽器不允許以 blob: URL 註冊 Service Worker，因此本單檔版不註冊無效的 SW。
+    // 若日後要提供真正的離線快取，必須另外部署同源的 sw.js 檔案。
+    let baseUrl = new URL('.', window.location.href).href;
+    const startUrl = window.location.href.split('#')[0];
+    const inlineIcon = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(
+      "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'><rect width='512' height='512' rx='100' fill='#34A853'/><rect x='112' y='90' width='288' height='332' rx='28' fill='white'/><path d='M172 174h168M172 232h168M172 290h112' stroke='#34A853' stroke-width='24' stroke-linecap='round'/><path d='M300 350l28 28 62-70' fill='none' stroke='#34A853' stroke-width='24' stroke-linecap='round' stroke-linejoin='round'/></svg>"
+    );
     const manifest = {
-      "name": "家用雲帳本", "short_name": "家用雲帳本", "start_url": startUrl,
-      "display": "standalone", "background_color": "#f2f2f7", "theme_color": "#34A853",
-      "icons": [
-        { "src": absoluteIconUrl, "sizes": "192x192 512x512", "type": "image/x-icon", "purpose": "any maskable" },
-        { "src": "data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' fill='%2334A853'/%3E%3Ctext x='50' y='55' font-size='20' text-anchor='middle' fill='%23FFF' font-family='sans-serif'%3E帳本%3C/text%3E%3C/svg%3E", "sizes": "192x192", "type": "image/svg+xml", "purpose": "any" }
+      name: "家用雲帳本",
+      short_name: "家用雲帳本",
+      start_url: startUrl,
+      scope: baseUrl,
+      display: "standalone",
+      background_color: "#f2f2f7",
+      theme_color: "#34A853",
+      // 對同一個可縮放 SVG 宣告常用尺寸，讓不同瀏覽器有更好的選擇。
+      icons: [
+        { src: inlineIcon, sizes: "192x192", type: "image/svg+xml", purpose: "any" },
+        { src: inlineIcon, sizes: "512x512", type: "image/svg+xml", purpose: "any maskable" },
+        { src: inlineIcon, sizes: "any", type: "image/svg+xml", purpose: "any" }
       ]
     };
-    const manifestBlob = new Blob([JSON.stringify(manifest)], {type: 'application/json'});
+    const manifestBlob = new Blob([JSON.stringify(manifest)], { type: 'application/manifest+json' });
     document.getElementById('manifest-link').href = URL.createObjectURL(manifestBlob);
-
-    if ('serviceWorker' in navigator) {
-      const swCode = `
-        self.addEventListener('install', e => self.skipWaiting());
-        self.addEventListener('activate', e => e.waitUntil(self.clients.claim()));
-        self.addEventListener('fetch', e => {
-          e.respondWith(fetch(e.request).catch(() => {
-            if (e.request.url.includes('exec')) return new Response(JSON.stringify({ status: 'error', message: '目前處於離線狀態' }), { headers: { 'Content-Type': 'application/json' } });
-            return new Response('目前處於離線狀態');
-          }));
-        });
-      `;
-      const swBlob = new Blob([swCode], {type: 'application/javascript'});
-      window.addEventListener('load', () => navigator.serviceWorker.register(URL.createObjectURL(swBlob)));
-    }
   </script>
 
   <style>
@@ -50,15 +45,20 @@
     
     .app-header { background-color: #34A853; color: white; padding: 8px 0; position: sticky; top: 0; z-index: 1000; box-shadow: 0 2px 5px rgba(0,0,0,0.1); width: 100%; transition: background-color 0.3s; display: grid; grid-template-columns: 85px 1fr 85px; align-items: center; }
     #headerTitle { grid-column: 2; text-align: center; font-size: 22px; font-weight: bold; letter-spacing: 1px; white-space: nowrap; }
-    .switch-btn { grid-column: 3; justify-self: end; margin-right: 12px; background: rgba(255, 255, 255, 0.2); border: 1px solid rgba(255, 255, 255, 0.5); color: white; padding: 6px 10px; border-radius: 20px; font-size: 13px; cursor: pointer; font-weight: bold; backdrop-filter: blur(5px); }
+    .switch-btn { grid-column: 3; justify-self: end; width: auto; margin: 0 12px 0 0; background: rgba(255, 255, 255, 0.2); border: 1px solid rgba(255, 255, 255, 0.5); color: white; padding: 6px 10px; border-radius: 20px; font-size: 13px; cursor: pointer; font-weight: bold; backdrop-filter: blur(5px); }
     .switch-btn:active { background: rgba(255, 255, 255, 0.4); }
 
-    .card { background: white; width: 100%; max-width: 450px; padding: 25px; margin: 20px; border-radius: 16px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); box-sizing: border-box; }
-    .tabs { display: flex; margin-bottom: 20px; background: #eee; border-radius: 8px; overflow: hidden; }
-    .tab { flex: 1; text-align: center; padding: 14px; cursor: pointer; font-weight: bold; color: #666; transition: 0.3s; font-size: 18px; }
+    .card { background: white; width: calc(100% - 24px); max-width: 450px; padding: 20px; margin: 12px 0 24px; border-radius: 16px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); box-sizing: border-box; }
+    .tabs { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 3px; margin-bottom: 20px; padding: 4px; background: #eee; border-radius: 10px; overflow: hidden; }
+    .tab { min-width: 0; text-align: center; padding: 12px 4px; cursor: pointer; font-weight: bold; color: #666; transition: 0.3s; font-size: 16px; border-radius: 7px; }
     .tab.active { background: #007AFF; color: white; }
     .view-section { display: none; }
     .view-section.active { display: block; }
+    .setting-group { background: #f8f9fa; padding: 15px; border-radius: 12px; border: 1px solid #e8eaed; margin-top: 16px; }
+    .setting-title { margin-top: 0; color: #364152; font-size: 18px; }
+    .setting-description { color: #6b7280; font-size: 14px; line-height: 1.5; margin: 6px 0 10px; }
+    .settings-action { margin-top: 10px; padding: 12px; font-size: 16px; }
+    .sync-status { font-size: 15px; line-height: 1.5; font-weight: 600; margin-top: 14px; padding: 12px; background: #eef5ff; color: #1756a9; border-radius: 8px; text-align: center; white-space: pre-line; overflow-wrap: anywhere; }
 
     label { display: block; margin-top: 15px; font-weight: bold; color: #555; font-size: 18px; }
     input, select { width: 100%; padding: 14px; margin-top: 8px; border-radius: 8px; border: 1px solid #ddd; box-sizing: border-box; font-size: 20px; background: #fafafa; }
@@ -102,6 +102,7 @@
     .modal-actions { display: flex; gap: 10px; }
     .modal-actions button { margin-top: 0; flex: 1; padding: 14px; font-size: 18px; }
     .btn-cancel { background: #E0E0E0; color: #333; }
+    .settings-modal-card { max-height: 85vh; overflow-y: auto; }
 
     .calc-grid-new { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
     .key { background: #f8f9fa; color: #333; font-size: 26px; font-weight: bold; padding: 16px 0; border: 1px solid #ddd; border-radius: 8px; cursor: pointer; transition: 0.1s; margin-top: 0; }
@@ -111,6 +112,11 @@
     .key-act { background: #E8F5E9; color: #2E7D32; border-color: #C8E6C9; font-size: 22px; }
     .key-act.is-calc { background: #007AFF; color: white; border-color: #007AFF; font-size: 32px; }
     #calcDisplay { background: #f0f2f5; padding: 15px; text-align: right; font-size: 34px; font-weight: bold; border-radius: 8px; margin-bottom: 15px; min-height: 40px; word-break: break-all; color: #333; overflow-x: auto; white-space: nowrap; }
+    @media (max-width: 360px) {
+      .card { padding: 15px; }
+      .tab { font-size: 14px; padding: 11px 2px; }
+      .quick-tags { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    }
   </style>
 </head>
 
@@ -121,83 +127,36 @@
   </div>
   
   <div class="card">
-    <button id="installAppBtn">📲 點擊安裝「家用雲帳本」APP</button>
+    <button id="installAppBtn" onclick="handleInstallApp()">📲 安裝／加入主畫面</button>
 
-    <div class="tabs">
-      <div class="tab active" onclick="switchTab('add')">✏️ 新增</div>
-      <div class="tab" onclick="switchTab('search')">🔍 查詢</div>
-      <div class="tab" onclick="switchTab('chart')">📊 圖表</div>
+    <div class="tabs" role="tablist" aria-label="主要功能">
+      <div class="tab active" role="tab" aria-selected="true" onclick="switchTab('add')">✏️ 記帳</div>
+      <div class="tab" role="tab" aria-selected="false" onclick="switchTab('search')">🔍 帳目</div>
+      <div class="tab" role="tab" aria-selected="false" onclick="switchTab('chart')">📊 分析</div>
+      <div class="tab" role="tab" aria-selected="false" onclick="switchTab('settings')">⚙️ 設定</div>
     </div>
     
     <!-- ✏️ 新增帳目與系統設定頁面 -->
     <div id="addView" class="view-section active">
-      <div style="display: flex; justify-content: space-between; align-items: center;">
-        <label style="margin-top: 0;">📅 日期</label>
-        <span id="tzToggleBtn" style="font-size: 14px; cursor: pointer; font-weight: bold; background: #E8F5E9; color: #2E7D32; padding: 6px 12px; border-radius: 15px;" onclick="toggleTimezone()">🌍 台灣時間</span>
-      </div>
+      <label style="margin-top: 0;">📅 日期</label>
       <input type="date" id="dateInput">
       
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 15px;">
-        <label style="margin-top: 0;">🏷️ 分類</label>
-        <span style="font-size: 16px; color: #007AFF; cursor: pointer; font-weight: bold;" onclick="openSettingsModal('categories')">⚙️ 自訂分類</span>
-      </div>
+      <label>🏷️ 分類</label>
       <select id="categoryInput"></select>
       
       <label>💰 金額 (元)</label>
       <input type="text" id="amountInput" placeholder="🧮 點擊輸入金額..." onclick="openCalcModal('amountInput')" readonly style="cursor: pointer; background: #F4F8FF; color: #007AFF; font-weight: bold; text-align: center; border-color: #007AFF;">
       
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 15px;">
-        <label style="margin-top: 0;">📝 項目說明</label>
-        <span style="font-size: 16px; color: #007AFF; cursor: pointer; font-weight: bold;" onclick="openSettingsModal('tags')">⚙ 自訂標籤</span>
-      </div>
+      <label>📝 項目說明</label>
       <div class="quick-tags" id="quickTagsContainer"></div>
       <input type="text" id="itemInput" placeholder="例如：晚餐 石二鍋" list="historySuggestions">
       <datalist id="historySuggestions"></datalist>
       
       <button onclick="submitData()">新增帳目</button>
 
-      <hr style="border: 0; height: 1px; background: #ddd; margin: 40px 0 20px 0;">
-      
-      <div style="background: #f8f9fa; padding: 15px; border-radius: 12px; border: 1px solid #eee;">
-        <label style="margin-top: 0; color: #007AFF; font-size: 18px;">🔄 雲端同步</label>
-        <button class="sync-btn" style="background: #E02020;" onclick="syncData('this_month')">⚡ 本月極速同步</button>
-
-        <div style="display: flex; gap: 10px; margin-top: 15px; align-items: center;">
-          <select id="syncYearSelect" style="margin-top: 0; flex: 1; padding: 10px;"></select>
-          <span style="font-weight: bold; color: #555;">年</span>
-          <select id="syncMonthSelect" style="margin-top: 0; flex: 1; padding: 10px;">
-            <option value="全部">全部</option>
-            <option value="1月">1月</option><option value="2月">2月</option>
-            <option value="3月">3月</option><option value="4月">4月</option>
-            <option value="5月">5月</option><option value="6月">6月</option>
-            <option value="7月">7月</option><option value="8月">8月</option>
-            <option value="9月">9月</option><option value="10月">10月</option>
-            <option value="11月">11月</option><option value="12月">12月</option>
-          </select>
-        </div>
-        <button class="sync-btn" style="background: #34C759; margin-top: 10px;" onclick="syncData('custom')">⚙ 指定月份同步</button>
-        <button class="sync-btn" style="background: #FF9500; margin-top: 15px;" onclick="syncData('all')">🔄 歷年完整同步</button>
-        
-        <div class="sync-status" id="syncStatus" style="font-size: 18px; font-weight: bold; margin-top: 15px; color: #007AFF; text-align: center;">尚未同步資料</div>
-      </div>
-
-      <div style="background: #f8f9fa; padding: 15px; border-radius: 12px; border: 1px solid #eee; margin-top: 20px;">
-        <label style="margin-top: 0; color: #607D8B; font-size: 18px;">💾 本地與雲端資料備份</label>
-        
-        <div style="display: flex; gap: 10px; margin-top: 10px;">
-          <button id="driveBackupBtn" style="background: #4285F4; margin-top: 0; flex: 1; padding: 12px; font-size: 16px;" onclick="backupToDrive()">☁️ 雲端備份</button>
-          <button id="driveRestoreBtn" style="background: #00BCD4; margin-top: 0; flex: 1; padding: 12px; font-size: 16px;" onclick="restoreFromDrive()">☁️ 雲端還原</button>
-        </div>
-
-        <div style="display: flex; gap: 10px; margin-top: 10px;">
-          <button style="background: #607D8B; margin-top: 0; flex: 1; padding: 12px; font-size: 16px;" onclick="exportBackup()">📥 本機備份</button>
-          <button style="background: #78909C; margin-top: 0; flex: 1; padding: 12px; font-size: 16px;" onclick="document.getElementById('importBackupInput').click()">📤 本機還原</button>
-        </div>
-        <input type="file" id="importBackupInput" accept=".json" style="display: none;" onchange="importBackup(event)">
-      </div>
     </div>
 
-    <!-- 🔍 查詢帳目 -->
+    <!-- 🔍 帳目查詢與管理 -->
     <div id="searchView" class="view-section">
       <label style="margin-top: 0;">🔍 萬用搜尋 (支援空白分隔多關鍵字)</label>
       <input type="text" id="searchInput" placeholder="例：112年 晚餐..." oninput="filterLocalData()">
@@ -232,12 +191,83 @@
       </div>
       <div id="chartTotalInfo" style="text-align: center; margin-top: 15px; font-size: 20px; font-weight: bold; color: #333;"></div>
     </div>
+
+    <!-- ⚙️ 設定、同步與備份 -->
+    <div id="settingsView" class="view-section">
+      <h3 style="margin: 0 0 6px; font-size: 22px;">⚙️ 系統設定</h3>
+      <p style="margin: 0; color: #777; line-height: 1.5;">不常使用的管理功能集中在這裡，記帳畫面保持簡潔。</p>
+
+      <div class="setting-group">
+        <label class="setting-title">🌍 日期與時間</label>
+        <p class="setting-description">選擇新增帳目時，預設採用台灣時間或裝置當地時間。</p>
+        <button id="tzToggleBtn" class="settings-action" style="margin-top: 0; background: #E8F5E9; color: #2E7D32; border: 1px solid #C8E6C9;" onclick="toggleTimezone()">🌍 台灣時間</button>
+      </div>
+
+      <div class="setting-group">
+        <label class="setting-title">🏷️ 分類與標籤</label>
+        <p class="setting-description">管理記帳時使用的分類及快速輸入標籤。</p>
+        <button class="settings-action" style="margin-top: 0; background: #607D8B;" onclick="openSettingsModal('categories')">管理記帳分類</button>
+        <button class="settings-action" style="background: #78909C;" onclick="openSettingsModal('tags')">管理自訂標籤</button>
+      </div>
+
+      <div class="setting-group">
+        <label class="setting-title">🔄 雲端資料同步</label>
+        <p class="setting-description">同步會將雲端帳目載入本機，供帳目查詢及圖表分析使用；這和備份是不同的功能。</p>
+        <button class="sync-btn" style="background: #2478D4; margin-top: 0;" onclick="syncData('this_month')">📅 同步本月帳目</button>
+        <div style="display: flex; gap: 10px; margin-top: 15px; align-items: center;">
+          <select id="syncYearSelect" aria-label="同步年度" style="margin-top: 0; flex: 1; padding: 10px;"></select>
+          <span style="font-weight: bold; color: #555;">年</span>
+          <select id="syncMonthSelect" aria-label="同步月份" style="margin-top: 0; flex: 1; padding: 10px;">
+            <option value="全部">全年</option>
+            <option value="1月">1月</option><option value="2月">2月</option>
+            <option value="3月">3月</option><option value="4月">4月</option>
+            <option value="5月">5月</option><option value="6月">6月</option>
+            <option value="7月">7月</option><option value="8月">8月</option>
+            <option value="9月">9月</option><option value="10月">10月</option>
+            <option value="11月">11月</option><option value="12月">12月</option>
+          </select>
+        </div>
+        <button class="sync-btn" style="background: #34A853;" onclick="syncData('custom')">指定月份同步</button>
+        <button class="sync-btn" style="background: #FF9500;" onclick="syncData('all')">完整歷年同步</button>
+        <div style="margin-top: 16px; font-size: 14px; font-weight: bold; color: #555;">同步狀態與最後同步時間</div>
+        <div class="sync-status" id="syncStatus" role="status" aria-live="polite">尚未同步資料</div>
+      </div>
+
+      <div class="setting-group">
+        <label class="setting-title">💾 備份與還原</label>
+        <p class="setting-description">備份可保存一份資料副本；還原會覆蓋目前帳本內容，操作前請確認備份來源。</p>
+        <div style="display: flex; gap: 10px; margin-top: 10px;">
+          <button id="driveBackupBtn" style="background: #4285F4; margin-top: 0; flex: 1; padding: 12px 6px; font-size: 15px;" onclick="backupToDrive()">☁️ 雲端備份</button>
+          <button id="driveRestoreBtn" style="background: #00A5B5; margin-top: 0; flex: 1; padding: 12px 6px; font-size: 15px;" onclick="restoreFromDrive()">☁️ 雲端還原</button>
+        </div>
+        <div style="display: flex; gap: 10px; margin-top: 10px;">
+          <button style="background: #607D8B; margin-top: 0; flex: 1; padding: 12px 6px; font-size: 15px;" onclick="exportBackup()">📥 本機備份</button>
+          <button style="background: #78909C; margin-top: 0; flex: 1; padding: 12px 6px; font-size: 15px;" onclick="document.getElementById('importBackupInput').click()">📤 本機還原</button>
+        </div>
+        <input type="file" id="importBackupInput" accept=".json,application/json" style="display: none;" onchange="importBackup(event)">
+      </div>
+    </div>
   </div>
 
   <!-- 浮動列與 Modals -->
   <div class="multi-select-bar" id="multiSelectBar">
     <span>已選取: <b id="selectCount" style="color:#4BC0C0; font-size:20px;">0</b> 筆<br>總計: $ <b id="selectSum" style="color:#FFCE56; font-size:20px;">0</b></span>
     <button onclick="exitMultiSelect()">❌ 退出</button>
+  </div>
+
+  <div class="modal-overlay" id="settingsModal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+    <div class="modal-card settings-modal-card">
+      <div class="modal-title" id="modalTitle">管理設定</div>
+      <div class="add-row">
+        <input type="text" id="modalNewInput" placeholder="輸入新的分類或標籤" aria-label="新增分類或標籤">
+        <button type="button" onclick="addModalItem()">新增</button>
+      </div>
+      <div class="modal-list" id="modalList"></div>
+      <div class="modal-actions">
+        <button type="button" class="btn-cancel" onclick="closeSettingsModal()">取消</button>
+        <button type="button" style="background: #34A853;" onclick="saveSettingsModal()">儲存設定</button>
+      </div>
+    </div>
   </div>
 
   <div class="modal-overlay" id="editModal">
@@ -309,8 +339,9 @@
     }
     function updateTzUI(useTW) {
       const btn = document.getElementById('tzToggleBtn');
-      if (useTW) { btn.innerHTML = "🌍 台灣時間"; btn.style.color = "#2E7D32"; btn.style.background = "#E8F5E9"; } 
-      else { btn.innerHTML = "📱 當地時間"; btn.style.color = "#E65100"; btn.style.background = "#FFF3E0"; }
+      if (!btn) return;
+      if (useTW) { btn.innerHTML = "🌍 目前設定：台灣時間（點擊切換）"; btn.style.color = "#2E7D32"; btn.style.background = "#E8F5E9"; }
+      else { btn.innerHTML = "📱 目前設定：裝置當地時間（點擊切換）"; btn.style.color = "#E65100"; btn.style.background = "#FFF3E0"; }
     }
     function getTodayDateString(useTW) {
       let now = new Date();
@@ -320,7 +351,40 @@
 
     const apiUrl = "https://script.google.com/macros/s/AKfycbxvVEOlqWPu-MraLhOcOp2OkAX0zD5tOLJFwlbHkqtWQAu9MRBh4I3ek4U9yn0jfevl/exec";
     let localLedgerData = []; let expenseChartInstance = null; let currentLedger = 'home'; 
-    let chartMode = 'month'; let chartType = 'category'; 
+    let chartMode = 'month'; let chartType = 'category';
+    let deferredInstallPrompt = null;
+    const isIOSDevice = /iphone|ipad|ipod/i.test(navigator.userAgent) && !window.MSStream;
+
+    window.addEventListener('beforeinstallprompt', (event) => {
+      event.preventDefault();
+      deferredInstallPrompt = event;
+      const btn = document.getElementById('installAppBtn');
+      if (btn) btn.style.display = 'block';
+    });
+
+    window.addEventListener('appinstalled', () => {
+      deferredInstallPrompt = null;
+      const btn = document.getElementById('installAppBtn');
+      if (btn) btn.style.display = 'none';
+    });
+
+    async function handleInstallApp() {
+      if (deferredInstallPrompt) {
+        deferredInstallPrompt.prompt();
+        const choice = await deferredInstallPrompt.userChoice;
+        if (choice && choice.outcome === 'accepted') {
+          const btn = document.getElementById('installAppBtn');
+          if (btn) btn.style.display = 'none';
+        }
+        deferredInstallPrompt = null;
+        return;
+      }
+      if (isIOSDevice) {
+        alert('請點擊 Safari 的「分享」按鈕，再選擇「加入主畫面」。');
+      } else {
+        alert('請開啟瀏覽器選單，尋找「安裝家用雲帳本」或「新增至主畫面」。若沒有此選項，請確認目前是透過 HTTPS 網址開啟。');
+      }
+    }
 
     function getStoreKey(keyName) { return currentLedger === 'home' ? keyName : keyName + '_studio'; }
 
@@ -441,6 +505,9 @@
 
     window.onload = function() {
       initTimezone();
+      const installBtn = document.getElementById('installAppBtn');
+      const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+      if (installBtn) installBtn.style.display = isStandalone ? 'none' : 'block';
       const currentTwYear = new Date().getFullYear() - 1911;
       const yearSelect = document.getElementById('syncYearSelect');
       for (let y = currentTwYear + 1; y >= 102; y--) { yearSelect.appendChild(new Option(y, y, false, y === currentTwYear)); }
@@ -450,11 +517,16 @@
     };
 
     function switchTab(tabName) {
-      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-      document.querySelectorAll('.view-section').forEach(v => v.classList.remove('active'));
-      document.querySelectorAll('.tab')[tabName==='add'?0:tabName==='search'?1:2].classList.add('active');
-      document.getElementById(tabName+'View').classList.add('active');
-      if (tabName === 'search') loadLocalData(); 
+      const tabNames = ['add', 'search', 'chart', 'settings'];
+      document.querySelectorAll('.tab').forEach((tab, index) => {
+        const active = tabNames[index] === tabName;
+        tab.classList.toggle('active', active);
+        tab.setAttribute('aria-selected', active ? 'true' : 'false');
+      });
+      document.querySelectorAll('.view-section').forEach(view => view.classList.remove('active'));
+      const targetView = document.getElementById(tabName + 'View');
+      if (targetView) targetView.classList.add('active');
+      if (tabName === 'search') loadLocalData();
       if (tabName === 'chart') { populateChartSelectors(); renderChart(); }
     }
 
