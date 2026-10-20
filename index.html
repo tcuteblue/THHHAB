@@ -390,7 +390,7 @@
     function getTodayDateString(useTW) {
       let now = new Date();
       if (useTW) { const utc = now.getTime() + (now.getTimezoneOffset() * 60000); now = new Date(utc + (3600000 * 8)); }
-      return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+      return `now.getFullYear()-{String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
     }
 
     const apiUrl = "https://script.google.com/macros/s/AKfycbxvVEOlqWPu-MraLhOcOp2OkAX0zD5tOLJFwlbHkqtWQAu9MRBh4I3ek4U9yn0jfevl/exec";
@@ -450,19 +450,21 @@
       return next;
     }
 
-    // 匯出到手機：先執行「本月極速同步」，成功後才產生本機備份檔。
+    // 匯出到手機：先嘗試「本月極速同步」；同步失敗仍備份目前本機資料與設定。
     function exportBackup(options = {}) {
       const silent = options.silent === true;
-      if (!silent && !confirm('備份前會先同步本月雲端帳目，確定繼續嗎？')) return Promise.resolve(false);
+      if (!silent && !confirm('備份前會先嘗試同步本月雲端帳目；若同步失敗，仍會備份目前本機資料與設定。確定繼續嗎？')) return Promise.resolve(false);
       const btn = document.getElementById('localBackupBtn');
-      if (btn) { btn.disabled = true; btn.innerText = '⏳ 同步本月資料中...'; }
+      if (btn) { btn.disabled = true; btn.innerText = '⏳ 嘗試同步本月...'; }
 
       return enqueueBackupOperation(async () => {
+        let synced = false;
         try {
-          const synced = await syncData('this_month', { silentSuccess: true, quietErrors: true, forBackup: true });
-          if (!synced) {
-            if (!silent) alert('❌ 本月同步未成功，已取消本機備份；原本本機資料未被覆蓋。');
-            return false;
+          try {
+            synced = await syncData('this_month', { silentSuccess: true, quietErrors: true, forBackup: true });
+          } catch (syncErr) {
+            console.warn('備份前同步失敗，仍將匯出本機備份：', syncErr);
+            synced = false;
           }
           const json = JSON.stringify({
             ledgerData: JSON.parse(localStorage.getItem(getStoreKey('myLedgerData')) || '[]'),
@@ -473,14 +475,17 @@
             useTaiwanTime: localStorage.getItem('useTaiwanTime') === 'false' ? 'false' : 'true'
           });
           const now = new Date();
-          const timeStamp = `${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}_${String(now.getHours()).padStart(2,'0')}${String(now.getMinutes()).padStart(2,'0')}`;
+          const timeStamp = `now.getFullYear(){String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}_${String(now.getHours()).padStart(2,'0')}${String(now.getMinutes()).padStart(2,'0')}`;
           const a = document.createElement('a');
           const objectUrl = URL.createObjectURL(new Blob([json], { type: 'application/json' }));
           a.href = objectUrl;
           a.download = `${currentLedger === 'home' ? '家用雲帳本' : '工作室帳本'}_${timeStamp}.json`;
           a.click();
           setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
-          if (!silent) alert('✅ 本機備份成功！已先更新本月帳目。');
+          if (!silent) {
+            if (synced) alert('✅ 本機備份成功！已先更新本月帳目。');
+            else alert('⚠️ 本月同步失敗，但本機備份已成功！備份包含目前本機帳目與設定；帳目可能較舊，設定仍已保存。');
+          }
           return true;
         } catch (err) {
           if (!silent) alert('❌ 本機備份失敗：' + err.message);
@@ -515,30 +520,29 @@
       }; reader.readAsText(file);
     }
     
-    // 🌟 雲端備份：自動與手動共用相同內容；一律先同步本月，再更新 Google Drive 備份檔。
+    // 🌟 雲端備份：自動與手動共用相同內容與同一個雲端備份檔；同步失敗也照常備份本機快取。
     function backupToDrive(isAuto = false) {
       const btn = document.getElementById('driveBackupBtn');
       if (!isAuto && btn) { btn.disabled = true; btn.innerText = '⏳ 等待同步...'; }
 
       return enqueueBackupOperation(async () => {
+        let synced = false;
         try {
-          if (!isAuto && btn) btn.innerText = '⏳ 同步本月資料中...';
-          const synced = await syncData('this_month', {
-            silentSuccess: true,
-            quietErrors: true,
-            forBackup: true
-          });
-          if (!synced) {
-            const statusEl = document.getElementById('syncStatus');
-            if (statusEl && isAuto) statusEl.innerText = '⚠️ 自動雲端備份取消：本月同步未完成';
-            if (!isAuto) alert('❌ 本月同步未完成，已取消雲端備份；原有雲端備份檔未變更。');
-            return false;
+          if (!isAuto && btn) btn.innerText = '⏳ 嘗試同步本月...';
+          try {
+            synced = await syncData('this_month', {
+              silentSuccess: true,
+              quietErrors: true,
+              forBackup: true
+            });
+          } catch (syncErr) {
+            console.warn('備份前同步失敗，仍將執行雲端備份：', syncErr);
+            synced = false;
           }
 
-          // 即使帳目目前為空，也要能備份分類、標籤與時區等設定。
+          // 同步成功就備份更新後資料；同步失敗則備份現有本機快取與設定。
+          // GAS 的 auto_backup 維持更新同一個既有備份檔，不建立任何備援檔。
           const storedData = localStorage.getItem(getStoreKey('myLedgerData')) || '[]';
-
-          if (!isAuto && btn) btn.innerText = '⏳ 雲端備份中...';
           const payload = {
             action: 'auto_backup',
             ledger: currentLedger,
@@ -552,17 +556,35 @@
             }
           };
 
+          if (!isAuto && btn) btn.innerText = '⏳ 雲端備份中...';
           const response = await fetch(apiUrl, { method: 'POST', body: JSON.stringify(payload) });
           const res = await response.json();
           if (res.status !== 'success') throw new Error(res.message || '雲端拒絕備份請求');
-          if (!isAuto) alert('✅ 雲端備份成功！已先更新本月帳目。');
-          console.log(isAuto ? '設定變更觸發的自動雲端備份成功' : '手動雲端備份成功');
+
+          const statusEl = document.getElementById('syncStatus');
+          if (statusEl && isAuto && !synced) {
+            statusEl.innerText = '⚠️ 本月同步失敗；仍已完成自動雲端備份（帳目可能較舊，設定已保存）';
+            statusEl.style.color = '#FF9500';
+          }
+          if (!isAuto) {
+            if (synced) alert('✅ 雲端備份成功！已先更新本月帳目。');
+            else alert('⚠️ 本月同步失敗，但雲端備份已成功！已將目前本機帳目與設定寫入既有雲端備份檔；帳目可能較舊，設定已保存。');
+          }
+          console.log(isAuto ? (synced ? '設定變更觸發的自動雲端備份成功' : '本月同步失敗，但自動雲端備份成功') : '手動雲端備份成功');
           return true;
         } catch (err) {
           console.error('雲端備份失敗：', err);
           const statusEl = document.getElementById('syncStatus');
-          if (statusEl && isAuto) statusEl.innerText = '⚠️ 自動雲端備份失敗，請檢查網路後手動備份';
-          if (!isAuto) alert('❌ 雲端備份失敗：' + (err.message || '連線錯誤'));
+          if (statusEl && isAuto) {
+            statusEl.innerText = synced
+              ? '⚠️ 自動雲端備份失敗；請檢查網路後手動備份'
+              : '⚠️ 本月同步失敗，且自動雲端備份也失敗；本機資料與設定仍保留，請手動備份';
+            statusEl.style.color = '#FF3B30';
+          }
+          if (!isAuto) {
+            if (synced) alert('❌ 雲端備份失敗：' + (err.message || '連線錯誤'));
+            else alert('⚠️ 本月同步失敗，且雲端備份也失敗：' + (err.message || '連線錯誤') + '\n目前本機資料與設定仍保留，請稍後重試。');
+          }
           return false;
         } finally {
           if (btn && !isAuto) { btn.innerText = '☁️ 雲端備份'; btn.disabled = false; }
@@ -735,7 +757,7 @@
       const totalAmount = filtered.reduce((sum, item) => sum + (parseFloat(String(item.amount == null ? '0' : item.amount).replace(/,/g, '')) || 0), 0);
       const categoryLabel = category === '__ALL__' ? '全部分類' : category;
       summary.style.display = 'block';
-      summary.innerText = `${monthKey}｜${categoryLabel}\n共 ${filtered.length} 筆明細｜明細金額合計 $ ${totalAmount.toLocaleString()}`;
+      summary.innerText = `monthKey｜{categoryLabel}\n共 ${filtered.length} 筆明細｜明細金額合計 $ ${totalAmount.toLocaleString()}`;
 
       if (filtered.length === 0) {
         resultBox.innerHTML = '<div class="result-item" style="text-align:center; color:#777;">這個年月與分類沒有找到明細。</div>';
@@ -748,7 +770,7 @@
         const monthText = escapeHtml(item.month || '');
         const amount = escapeHtml(item.amount == null ? '0' : item.amount);
         return `<div class="result-item" style="display:flex; justify-content:space-between; align-items:flex-start; gap:10px;">
-          <div style="flex:1; min-width:0;"><div class="result-month">📍 ${monthText}</div><div style="font-size:17px; line-height:1.5; overflow-wrap:anywhere;">${categoryHtml} ${detail}</div></div>
+          <div style="flex:1; min-width:0;"><div class="result-month">📍 monthText</div><divstyle="font-size:17px;line-height:1.5;overflow-wrap:anywhere;">{categoryHtml} ${detail}</div></div>
           <div class="result-amount" style="text-align:right; flex-shrink:0; margin-top:0;">$ ${amount}</div>
         </div>`;
       }).join('');
@@ -827,7 +849,7 @@
         const q = queue[i];
         const monthLabel = Array.isArray(q.month) ? (q.month[0] === '1月' ? '上半年' : '下半年') : q.month;
         if (statusEl) {
-          statusEl.innerText = `${options.forBackup ? '⏳ 備份前更新' : '⏳ 正在抓取'} ${q.year}年 ${monthLabel} (${i + 1}/${queue.length})...`;
+          statusEl.innerText = `${options.forBackup ? '⏳ 備份前更新' : '⏳ 正在抓取'} ${q.year}年 monthLabel({i + 1}/${queue.length})...`;
           statusEl.style.color = '#FF9500';
         }
 
@@ -934,9 +956,9 @@
         resultBox.innerHTML = '<div class="result-item" style="text-align:center;">找不到符合的紀錄 🥲</div>';
       } else {
         let html = filtered.map((item, index) => {
-          const safe = encodeURIComponent(JSON.stringify(item)); const domId = `res-${index}`; const amt = parseFloat(item.amount.toString().replace(/,/g, '')) || 0; const isSel = selectedItemsMap.has(`${item.month}|${item.category}|${item.detail}|${item.amount}`);
-          return `<div id="${domId}" class="result-item" style="display: flex; justify-content: space-between; align-items: center; cursor: pointer; user-select: none; ${isSel ? "background: #E3F2FD; border-left: 6px solid #007AFF;" : "border-left: 4px solid #34C759;"}" oncontextmenu="return false;" ontouchstart="startPress(event, '${domId}', '${item.month}|${item.category}|${item.detail}|${item.amount}', ${amt})" ontouchend="endPress(event)" onmousedown="startPress(event, '${domId}', '${item.month}|${item.category}|${item.detail}|${item.amount}', ${amt})" onmouseup="endPress(event)" onmouseleave="endPress(event)" onclick="itemClick(event, '${domId}', '${item.month}|${item.category}|${item.detail}|${item.amount}', '${safe}')">
-            <div style="flex: 1; pointer-events: none;"><div class="result-month">📍 ${item.month}</div><div style="font-size: 18px;">${item.category ? `<span class="result-category">${item.category}</span>` : ''} ${item.detail}</div></div>
+          const safe = encodeURIComponent(JSON.stringify(item)); const domId = `res-index`;constamt=parseFloat(item.amount.toString().replace(/,/g,''))||0;constisSel=selectedItemsMap.has(`{item.month}|item.category|{item.detail}|${item.amount}`);
+          return `<div id="${domId}" class="result-item" style="display: flex; justify-content: space-between; align-items: center; cursor: pointer; user-select: none; isSel?"background:#E3F2FD;border-left:6pxsolid#007AFF;":"border-left:4pxsolid#34C759;""oncontextmenu="returnfalse;"ontouchstart="startPress(event,'{domId}', 'item.month|{item.category}|item.detail|{item.amount}', amt)"ontouchend="endPress(event)"onmousedown="startPress(event,'{domId}', 'item.month|{item.category}|item.detail|{item.amount}', amt)"onmouseup="endPress(event)"onmouseleave="endPress(event)"onclick="itemClick(event,'{domId}', 'item.month|{item.category}|item.detail|{item.amount}', '${safe}')">
+            <div style="flex: 1; pointer-events: none;"><div class="result-month">📍 item.month</div><divstyle="font-size:18px;">{item.category ? `<span class="result-category">${item.category}</span>` : ''} ${item.detail}</div></div>
             <div class="result-amount" style="text-align: right; pointer-events: none;">$ ${item.amount}</div></div>`;
         }).join('');
         
@@ -967,7 +989,7 @@
     }
     function exitMultiSelect() { multiSelectMode = false; selectedItemsMap.clear(); document.getElementById('multiSelectBar').style.display = 'none'; filterLocalData(); }
 
-    function openEditModal(itemStr) { const i = JSON.parse(decodeURIComponent(itemStr)); document.getElementById('editMonth').value = i.month; document.getElementById('editOldCategory').value = i.category; document.getElementById('editOldDetail').value = i.detail; document.getElementById('editOldAmount').value = i.amount; document.getElementById('editMonthDisplay').innerText = `📍 ${i.month}`; document.getElementById('editDetailInput').value = i.detail; document.getElementById('editAmountInput').value = i.amount; document.getElementById('editCategoryInput').innerHTML = (localStorage.getItem(getStoreKey('myCustomCategories'))||defaultCategories).split(',').filter(t=>t.trim()!=='').map(c => `<option value="${c}">${c}</option>`).join(''); document.getElementById('editCategoryInput').value = i.category; document.getElementById('editModal').style.display = 'flex'; }
+    function openEditModal(itemStr) { const i = JSON.parse(decodeURIComponent(itemStr)); document.getElementById('editMonth').value = i.month; document.getElementById('editOldCategory').value = i.category; document.getElementById('editOldDetail').value = i.detail; document.getElementById('editOldAmount').value = i.amount; document.getElementById('editMonthDisplay').innerText = `📍 i.month`;document.getElementById('editDetailInput').value=i.detail;document.getElementById('editAmountInput').value=i.amount;document.getElementById('editCategoryInput').innerHTML=(localStorage.getItem(getStoreKey('myCustomCategories'))||defaultCategories).split(',').filter(t=>t.trim()!=='').map(c=>`<optionvalue="{c}">${c}</option>`).join(''); document.getElementById('editCategoryInput').value = i.category; document.getElementById('editModal').style.display = 'flex'; }
     function closeEditModal() { document.getElementById('editModal').style.display = 'none'; }
     function saveEditRecord() { const d = { action:'edit', ledger:currentLedger, month:document.getElementById('editMonth').value, oldCategory:document.getElementById('editOldCategory').value, oldDetail:document.getElementById('editOldDetail').value, oldAmount:document.getElementById('editOldAmount').value, newCategory:document.getElementById('editCategoryInput').value, newDetail:document.getElementById('editDetailInput').value, newAmount:document.getElementById('editAmountInput').value }; if(!d.newDetail||!d.newAmount) return alert("請填寫完整"); closeEditModal(); fetch(apiUrl, { method: "POST", body: JSON.stringify(d) }).then(res => res.json()).then(res => { if(res.status==='success') { let idx = localLedgerData.findIndex(item => item.month===d.month && item.category===d.oldCategory && item.detail===d.oldDetail && item.amount===d.oldAmount); if (idx!==-1) { localLedgerData[idx].category=d.newCategory; localLedgerData[idx].detail=d.newDetail; localLedgerData[idx].amount=d.newAmount; localStorage.setItem(getStoreKey('myLedgerData'), JSON.stringify(localLedgerData)); filterLocalData(); } alert("✅ 修改成功"); } }); }
     function confirmDeleteFromEdit() {
@@ -1009,11 +1031,11 @@
     const defaultTags = "早餐,午餐,晚餐";
     function openSettingsModal(mode) { currentEditMode = mode; document.getElementById('settingsModal').style.display = 'flex'; document.getElementById('modalNewInput').value = ''; document.getElementById('modalTitle').innerText = mode === 'categories' ? "🏷️ 管理記帳分類" : "📝 管理自訂標籤"; tempEditingItems = (localStorage.getItem(getStoreKey(mode === 'categories' ? 'myCustomCategories' : 'myCustomTags')) || (mode === 'categories' ? defaultCategories : defaultTags)).split(',').filter(t=>t.trim()!==''); renderModalList(); }
     function closeSettingsModal() { document.getElementById('settingsModal').style.display = 'none'; }
-    function renderModalList() { document.getElementById('modalList').innerHTML = tempEditingItems.map((item, i) => `<div class="modal-list-item"><span>${item}</span><span class="delete-btn" onclick="removeModalItem(${i})">❌</span></div>`).join(''); }
+    function renderModalList() { document.getElementById('modalList').innerHTML = tempEditingItems.map((item, i) => `<div class="modal-list-item"><span>item</span><spanclass="delete-btn"onclick="removeModalItem({i})">❌</span></div>`).join(''); }
     function removeModalItem(i) { tempEditingItems.splice(i, 1); renderModalList(); }
     function addModalItem() { const val = document.getElementById('modalNewInput').value.trim().replace(/,/g, ''); if (val) { tempEditingItems.push(val); document.getElementById('modalNewInput').value = ''; renderModalList(); } }
     function saveSettingsModal() { localStorage.setItem(getStoreKey(currentEditMode === 'categories' ? 'myCustomCategories' : 'myCustomTags'), tempEditingItems.join(',')); currentEditMode === 'categories' ? loadCategories() : loadQuickTags(); closeSettingsModal(); backupToDrive(true); }
-    function loadCategories() { const cats = (localStorage.getItem(getStoreKey('myCustomCategories')) || defaultCategories).split(',').filter(t=>t.trim()!==''); document.getElementById('categoryInput').innerHTML = cats.map(c => `<option value="${c}">${c}</option>`).join(''); }
+    function loadCategories() { const cats = (localStorage.getItem(getStoreKey('myCustomCategories')) || defaultCategories).split(',').filter(t=>t.trim()!==''); document.getElementById('categoryInput').innerHTML = cats.map(c => `<option value="c">{c}</option>`).join(''); }
     function loadQuickTags() { const tags = (localStorage.getItem(getStoreKey('myCustomTags')) || defaultTags).split(',').filter(t=>t.trim()!==''); document.getElementById('quickTagsContainer').innerHTML = tags.map(tag => `<span onclick="document.getElementById('itemInput').value='${tag} ';document.getElementById('itemInput').focus();">✨ ${tag}</span>`).join(''); }
     function updateDatalist() { if (!localLedgerData) return; const uniqueItems = new Set(); localLedgerData.filter(i=>i.category!=="系統彙總").forEach(item => { let cleanName = item.detail.trim().replace(/^(\d{2,3}\/)?\d{1,2}\/\d{1,2}\s*/, '').replace(/[\s\-$]*(NT\$?\vert{}\$)?\d+(?:\.\d+)?[元\s]*$/i, '').trim(); if (cleanName) uniqueItems.add(cleanName); }); document.getElementById('historySuggestions').innerHTML = Array.from(uniqueItems).map(v => `<option value="${v}">`).join(''); }
 
@@ -1259,7 +1281,7 @@
           let datasets = Object.keys(catMap).map((cat, idx) => {
             let catTotal = catMap[cat].reduce((a, b) => a + b, 0);
             return { 
-              label: `${cat}：$ ${catTotal.toLocaleString()}`, 
+              label: `cat： ${catTotal.toLocaleString()}`, 
               data: catMap[cat], 
               backgroundColor: colors[idx % colors.length] 
             };
@@ -1281,7 +1303,7 @@
             categoryTotals[cat] = (categoryTotals[cat] || 0) + amt; totalAmt += amt;
           });
           
-          const labelsWithValues = Object.keys(categoryTotals).map(cat => `${cat}：$ ${categoryTotals[cat].toLocaleString()}`);
+          const labelsWithValues = Object.keys(categoryTotals).map(cat => `cat： ${categoryTotals[cat].toLocaleString()}`);
 
           expenseChartInstance = new Chart(ctx, { 
             type: 'doughnut', data: { labels: labelsWithValues, datasets: [{ data: Object.values(categoryTotals), backgroundColor: ['#FF6384','#36A2EB','#FFCE56','#4BC0C0','#9966FF','#FF9F40','#8D6E63','#26A69A','#EC407A'] }] }, 
@@ -1331,3 +1353,4 @@
   </script>
 </body>
 </html>
+
