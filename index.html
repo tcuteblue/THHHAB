@@ -130,14 +130,39 @@
     .btn-cancel { background: #E0E0E0; color: #333; }
     .settings-modal-card { max-height: 85vh; overflow-y: auto; }
 
-    .calc-grid-new { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
-    .key { background: #f8f9fa; color: #333; font-size: 26px; font-weight: bold; padding: 16px 0; border: 1px solid #ddd; border-radius: 8px; cursor: pointer; transition: 0.1s; margin-top: 0; }
-    .key:active { background: #e2e6ea; transform: scale(0.95); }
+    /* 計算機採底部面板呈現，面板頂端依金額欄位位置計算，不遮住正在輸入的欄位。 */
+    .calc-modal-overlay {
+      position: fixed; left: 0; right: 0; top: var(--calc-sheet-top, 0px); bottom: 0;
+      width: auto; height: auto; padding: 0; margin: 0;
+      display: none; justify-content: center; align-items: stretch;
+      background: transparent; backdrop-filter: none; -webkit-backdrop-filter: none;
+      overflow: hidden; z-index: 4000;
+    }
+    .calc-modal-overlay .calc-modal-card {
+      width: 100%; max-width: 450px; height: 100%; max-height: 100%; margin: 0;
+      box-sizing: border-box; border-radius: 18px 18px 0 0;
+      padding: 12px 16px calc(12px + env(safe-area-inset-bottom, 0px));
+      display: flex; flex-direction: column; gap: 8px;
+      overflow-y: auto; overscroll-behavior: contain;
+      box-shadow: 0 -5px 22px rgba(0,0,0,0.16);
+      animation: calcSheetUp 0.22s ease-out;
+    }
+    @keyframes calcSheetUp { from { transform: translateY(24px); opacity: 0.9; } to { transform: translateY(0); opacity: 1; } }
+    .calc-modal-card .modal-title { flex: 0 0 auto; font-size: 20px; margin: 0; line-height: 1.25; }
+    .calc-grid-new { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); grid-template-rows: repeat(5, minmax(34px, 1fr)); gap: 8px; flex: 1 0 250px; min-height: 250px; }
+    .key { background: #f8f9fa; color: #333; font-size: clamp(20px, 3.2vh, 28px); font-weight: bold; padding: 0; min-width: 0; min-height: 0; width: 100%; height: 100%; box-sizing: border-box; border: 1px solid #ddd; border-radius: 8px; cursor: pointer; transition: 0.1s; margin-top: 0; }
+    .key:active { background: #e2e6ea; transform: scale(0.97); }
     .key-op-math { background: #FFF3E0; color: #E65100; border-color: #FFE0B2; }
     .key-op-del { background: #FFEBEE; color: #C62828; border-color: #FFCDD2; }
-    .key-act { background: #E8F5E9; color: #2E7D32; border-color: #C8E6C9; font-size: 22px; }
-    .key-act.is-calc { background: #007AFF; color: white; border-color: #007AFF; font-size: 32px; }
-    #calcDisplay { background: #f0f2f5; padding: 15px; text-align: right; font-size: 34px; font-weight: bold; border-radius: 8px; margin-bottom: 15px; min-height: 40px; word-break: break-all; color: #333; overflow-x: auto; white-space: nowrap; }
+    .key-act { background: #E8F5E9; color: #2E7D32; border-color: #C8E6C9; font-size: 20px; }
+    .key-act.is-calc { background: #007AFF; color: white; border-color: #007AFF; font-size: 28px; }
+    #calcDisplay { background: #f0f2f5; padding: 9px 12px; text-align: right; font-size: clamp(24px, 4vh, 32px); font-weight: bold; border-radius: 8px; margin: 0; flex: 0 0 auto; min-height: 38px; word-break: break-all; color: #333; overflow-x: auto; white-space: nowrap; }
+    @media (max-height: 620px) {
+      .calc-modal-overlay .calc-modal-card { padding-top: 8px; gap: 6px; }
+      .calc-modal-card .modal-title { font-size: 18px; }
+      .calc-grid-new { gap: 5px; min-height: 210px; flex-basis: 210px; grid-template-rows: repeat(5, minmax(30px, 1fr)); }
+      .calc-modal-card #calcDisplay { padding: 6px 10px; min-height: 32px; }
+    }
     @media (max-width: 360px) {
       .card { padding: 15px; }
       .tab { font-size: 14px; padding: 11px 2px; }
@@ -166,18 +191,18 @@
     <div id="addView" class="view-section active">
       <label style="margin-top: 0;">📅 日期</label>
       <input type="date" id="dateInput">
-      
+
+      <label>💰 金額 (元)</label>
+      <input type="text" id="amountInput" placeholder="🧮 點擊輸入金額..." onclick="openCalcModal('amountInput')" readonly style="cursor: pointer; background: #F4F8FF; color: #007AFF; font-weight: bold; text-align: center; border-color: #007AFF;">
+
       <label>🏷️ 分類</label>
       <select id="categoryInput"></select>
-      
+
       <label>📝 項目說明</label>
       <div class="quick-tags" id="quickTagsContainer"></div>
       <input type="text" id="itemInput" placeholder="例如：晚餐 石二鍋" list="historySuggestions">
       <datalist id="historySuggestions"></datalist>
-      
-      <label>💰 金額 (元)</label>
-      <input type="text" id="amountInput" placeholder="🧮 點擊輸入金額..." onclick="openCalcModal('amountInput')" readonly style="cursor: pointer; background: #F4F8FF; color: #007AFF; font-weight: bold; text-align: center; border-color: #007AFF;">
-      
+
       <button id="submitDataBtn" type="button" onclick="submitData()">新增帳目</button>
 
     </div>
@@ -350,8 +375,8 @@
     </div>
   </div>
 
-  <div class="modal-overlay" id="calcModal">
-    <div class="modal-card" style="max-width: 380px; padding: 25px;">
+  <div class="modal-overlay calc-modal-overlay" id="calcModal" aria-modal="true" role="dialog" aria-label="金額計算機">
+    <div class="modal-card calc-modal-card">
       <div class="modal-title">🧮 計算機</div>
       <div id="calcDisplay">0</div>
       
@@ -1472,16 +1497,23 @@
     let isCalculating = false;
     let calcTargetInput = 'amountInput';
 
-    function openCalcModal(tId = 'amountInput') { 
-        calcTargetInput = tId; 
-        document.getElementById('calcModal').style.display = 'flex'; 
-        kpStr = document.getElementById(calcTargetInput).value || '0'; 
+    function openCalcModal(tId = 'amountInput') {
+        calcTargetInput = tId;
+        const modal = document.getElementById('calcModal');
+        const target = document.getElementById(calcTargetInput);
+        // 面板從金額欄位下緣開始向下展開；保留欄位本身可見，不對背景加霧化或暗色遮罩。
+        const top = target ? Math.max(0, Math.ceil(target.getBoundingClientRect().bottom + 6)) : Math.round(window.innerHeight * 0.4);
+        modal.style.setProperty('--calc-sheet-top', `${top}px`);
+        modal.style.display = 'flex';
+        kpStr = target ? (target.value || '0') : '0';
         checkCalcStatus();
-        updateAmtUI(); 
+        updateAmtUI();
     }
-    
-    function closeCalcModal() { 
-        document.getElementById('calcModal').style.display = 'none'; 
+
+    function closeCalcModal() {
+        const modal = document.getElementById('calcModal');
+        modal.style.display = 'none';
+        modal.style.removeProperty('--calc-sheet-top');
     }
 
     function formatCalcDisplay(str) {
