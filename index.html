@@ -65,7 +65,20 @@
     input:focus, select:focus { outline: none; border-color: #007AFF; background: white; }
     button { width: 100%; padding: 16px; background: #007AFF; color: white; border: none; border-radius: 8px; font-size: 20px; font-weight: bold; margin-top: 25px; cursor: pointer; transition: 0.2s; }
     button:active { transform: scale(0.98); }
-    button.sync-btn { margin-top: 10px; font-size: 16px; padding: 12px; } 
+    button.sync-btn { margin-top: 10px; font-size: 16px; padding: 12px; }
+    /* 共用的等待動畫：只套用在真正需要等待的操作按鈕。 */
+    @keyframes buttonSpinnerSpin { to { transform: rotate(360deg); } }
+    button.is-loading { display: inline-flex; align-items: center; justify-content: center; gap: 8px; cursor: wait !important; opacity: 0.92; }
+    button.is-loading::before { content: ""; display: inline-block; width: 16px; height: 16px; flex: 0 0 16px; box-sizing: border-box; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: buttonSpinnerSpin 0.7s linear infinite; vertical-align: middle; }
+    .sync-status.is-loading::before { content: ""; display: inline-block; width: 15px; height: 15px; margin-right: 8px; box-sizing: border-box; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: buttonSpinnerSpin 0.7s linear infinite; vertical-align: -2px; }
+    @media (prefers-reduced-motion: reduce) { button.is-loading::before, .sync-status.is-loading::before { animation-duration: 1.5s; } }
+    /* 新增帳目沿用專用的轉圈圖示與無障礙忙碌狀態；避免與共用按鈕轉圈重複顯示。 */
+    #submitDataBtn { display: flex; align-items: center; justify-content: center; gap: 10px; }
+    #submitDataBtn:disabled { cursor: wait; opacity: 0.85; }
+    .button-spinner { display: inline-block; width: 18px; height: 18px; flex: 0 0 18px; box-sizing: border-box; border: 3px solid rgba(255,255,255,0.38); border-top-color: currentColor; border-radius: 50%; animation: buttonSpin 0.75s linear infinite; }
+    @keyframes buttonSpin { to { transform: rotate(360deg); } }
+    button.is-loading.has-inline-spinner::before { display: none; }
+    @media (prefers-reduced-motion: reduce) { .button-spinner { animation-duration: 1.8s; } }
 
     #installAppBtn { background: #E8F5E9; color: #2E7D32; border: 2px solid #34A853; margin-top: 0; margin-bottom: 20px; display: none; animation: popIn 0.5s ease-out; }
     @keyframes popIn { 0% { transform: scale(0.9); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
@@ -162,7 +175,7 @@
       <input type="text" id="itemInput" placeholder="例如：晚餐 石二鍋" list="historySuggestions">
       <datalist id="historySuggestions"></datalist>
       
-      <button onclick="submitData()">新增帳目</button>
+      <button id="submitDataBtn" type="button" onclick="submitData()">新增帳目</button>
 
     </div>
 
@@ -257,7 +270,7 @@
       <div class="setting-group">
         <label class="setting-title">🔄 雲端資料同步</label>
         <p class="setting-description">同步會將雲端帳目載入本機，供帳目查詢及圖表分析使用；這和備份是不同的功能。</p>
-        <button class="sync-btn" style="background: #2478D4; margin-top: 0;" onclick="syncData('this_month')">⚡ 本月極速同步</button>
+        <button id="syncThisMonthBtn" class="sync-btn" style="background: #2478D4; margin-top: 0;" onclick="syncData('this_month')">⚡ 本月極速同步</button>
         <div style="display: flex; gap: 10px; margin-top: 15px; align-items: center;">
           <select id="syncYearSelect" aria-label="同步年度" style="margin-top: 0; flex: 1; padding: 10px;"></select>
           <span style="font-weight: bold; color: #555;">年</span>
@@ -271,8 +284,8 @@
             <option value="11月">11月</option><option value="12月">12月</option>
           </select>
         </div>
-        <button class="sync-btn" style="background: #34A853;" onclick="syncData('custom')">指定月份同步</button>
-        <button class="sync-btn" style="background: #FF9500;" onclick="syncData('all')">完整歷年同步</button>
+        <button id="syncCustomBtn" class="sync-btn" style="background: #34A853;" onclick="syncData('custom')">指定月份同步</button>
+        <button id="syncAllBtn" class="sync-btn" style="background: #FF9500;" onclick="syncData('all')">完整歷年同步</button>
         <div style="margin-top: 16px; font-size: 14px; font-weight: bold; color: #555;">同步狀態與最後同步時間</div>
         <div class="sync-status" id="syncStatus" role="status" aria-live="polite">尚未同步資料</div>
       </div>
@@ -286,7 +299,7 @@
         </div>
         <div style="display: flex; gap: 10px; margin-top: 10px;">
           <button id="localBackupBtn" style="background: #607D8B; margin-top: 0; flex: 1; padding: 12px 6px; font-size: 15px;" onclick="exportBackup()">📥 本機備份</button>
-          <button style="background: #78909C; margin-top: 0; flex: 1; padding: 12px 6px; font-size: 15px;" onclick="document.getElementById('importBackupInput').click()">📤 本機還原</button>
+          <button id="localRestoreBtn" style="background: #78909C; margin-top: 0; flex: 1; padding: 12px 6px; font-size: 15px;" onclick="document.getElementById('importBackupInput').click()">📤 本機還原</button>
         </div>
         <input type="file" id="importBackupInput" accept=".json,application/json" style="display: none;" onchange="importBackup(event)">
       </div>
@@ -325,9 +338,9 @@
       <input type="text" id="editDetailInput">
       <label>💰 金額 (元)</label>
       <input type="text" id="editAmountInput" readonly style="cursor: pointer; background: #F4F8FF; color: #007AFF; font-weight: bold; text-align: center;" onclick="openCalcModal('editAmountInput')">
-      <div class="modal-actions" style="margin-top: 25px;"><button class="btn-cancel" onclick="closeEditModal()">取消</button><button style="background: #34A853;" onclick="saveEditRecord()">💾 儲存修改</button></div>
+      <div class="modal-actions" style="margin-top: 25px;"><button id="editCancelBtn" class="btn-cancel" onclick="closeEditModal()">取消</button><button id="saveEditBtn" style="background: #34A853;" onclick="saveEditRecord()">💾 儲存修改</button></div>
       <hr style="border: 0; height: 1px; background: #eee; margin: 20px 0;">
-      <button style="background: #FF3B30; margin-top: 0; width: 100%;" onclick="confirmDeleteFromEdit()">🗑️ 刪除此筆紀錄</button>
+      <button id="deleteEditBtn" style="background: #FF3B30; margin-top: 0; width: 100%;" onclick="confirmDeleteFromEdit()">🗑️ 刪除此筆紀錄</button>
     </div>
   </div>
 
@@ -399,6 +412,83 @@
     let deferredInstallPrompt = null;
     const isIOSDevice = /iphone|ipad|ipod/i.test(navigator.userAgent) && !window.MSStream;
 
+    // 共用按鈕轉圈：保留原始標籤與 disabled 狀態，完成或失敗都能正確復原。
+    function startButtonLoading(button, loadingText) {
+      if (!button) return;
+      if (!button.classList.contains('is-loading')) {
+        button.dataset.loadingOriginalText = button.textContent;
+        button.dataset.loadingWasDisabled = button.disabled ? 'true' : 'false';
+      }
+      button.classList.add('is-loading');
+      button.disabled = true;
+      if (typeof loadingText === 'string') button.textContent = loadingText;
+    }
+    function updateButtonLoading(button, loadingText) {
+      if (!button) return;
+      if (!button.classList.contains('is-loading')) startButtonLoading(button, loadingText);
+      else button.textContent = loadingText;
+    }
+    function finishButtonLoading(button) {
+      if (!button) return;
+      const originalText = button.dataset.loadingOriginalText;
+      const wasDisabled = button.dataset.loadingWasDisabled === 'true';
+      if (originalText !== undefined) button.textContent = originalText;
+      button.classList.remove('is-loading');
+      button.disabled = wasDisabled;
+      delete button.dataset.loadingOriginalText;
+      delete button.dataset.loadingWasDisabled;
+    }
+
+    // 自動備份沒有手動操作按鈕，改在同步狀態區顯示旋轉提示。
+    let syncStatusBusyCount = 0;
+    function beginSyncStatusLoading(message) {
+      const el = document.getElementById('syncStatus');
+      syncStatusBusyCount++;
+      if (!el) return;
+      el.classList.add('is-loading');
+      if (message) el.innerText = message;
+      el.style.color = '#FF9500';
+    }
+    function updateSyncStatusLoading(message, color = '#FF9500') {
+      const el = document.getElementById('syncStatus');
+      if (!el) return;
+      el.classList.add('is-loading');
+      if (message) el.innerText = message;
+      el.style.color = color;
+    }
+    function endSyncStatusLoading() {
+      syncStatusBusyCount = Math.max(0, syncStatusBusyCount - 1);
+      if (syncStatusBusyCount === 0) {
+        const el = document.getElementById('syncStatus');
+        if (el) el.classList.remove('is-loading');
+      }
+    }
+
+    const syncButtonIds = { this_month: 'syncThisMonthBtn', custom: 'syncCustomBtn', all: 'syncAllBtn' };
+    let syncOperationInProgress = false;
+    let syncOperationPromise = null;
+    function setSyncButtonsBusy(mode, isBusy, forBackup = false) {
+      Object.entries(syncButtonIds).forEach(([buttonMode, id]) => {
+        const button = document.getElementById(id);
+        if (!button) return;
+        if (isBusy) {
+          if (!forBackup && buttonMode === mode) {
+            const labels = { this_month: '本月同步中...', custom: '指定月份同步中...', all: '完整歷年同步中...' };
+            startButtonLoading(button, labels[mode] || '同步中...');
+          } else {
+            if (button.dataset.syncWasDisabled === undefined) button.dataset.syncWasDisabled = button.disabled ? 'true' : 'false';
+            button.disabled = true;
+          }
+        } else {
+          if (button.classList.contains('is-loading')) finishButtonLoading(button);
+          if (button.dataset.syncWasDisabled !== undefined) {
+            button.disabled = button.dataset.syncWasDisabled === 'true';
+            delete button.dataset.syncWasDisabled;
+          }
+        }
+      });
+    }
+
     window.addEventListener('beforeinstallprompt', (event) => {
       event.preventDefault();
       deferredInstallPrompt = event;
@@ -455,17 +545,19 @@
       const silent = options.silent === true;
       if (!silent && !confirm('備份前會先嘗試同步本月雲端帳目；若同步失敗，仍會備份目前本機資料與設定。確定繼續嗎？')) return Promise.resolve(false);
       const btn = document.getElementById('localBackupBtn');
-      if (btn) { btn.disabled = true; btn.innerText = '⏳ 嘗試同步本月...'; }
+      if (btn) startButtonLoading(btn, '準備本機備份...');
 
       return enqueueBackupOperation(async () => {
         let synced = false;
         try {
           try {
+            updateButtonLoading(btn, '正在更新本月帳目...');
             synced = await syncData('this_month', { silentSuccess: true, quietErrors: true, forBackup: true });
           } catch (syncErr) {
             console.warn('備份前同步失敗，仍將匯出本機備份：', syncErr);
             synced = false;
           }
+          updateButtonLoading(btn, '正在產生備份檔...');
           const json = JSON.stringify({
             ledgerData: JSON.parse(localStorage.getItem(getStoreKey('myLedgerData')) || '[]'),
             syncInfo: localStorage.getItem(getStoreKey('myLedgerSyncInfo')) || '',
@@ -491,15 +583,20 @@
           if (!silent) alert('❌ 本機備份失敗：' + err.message);
           return false;
         } finally {
-          if (btn) { btn.disabled = false; btn.innerText = '📥 本機備份'; }
+          finishButtonLoading(btn);
         }
       });
     }
     
     // 從手機匯入
     function importBackup(e) {
-      const file = e.target.files[0]; if (!file) return;
-      if (!confirm(`⚠️ 這將覆蓋目前資料，確定匯入嗎？`)) { e.target.value = ''; return; }
+      const input = e.target;
+      const file = input.files && input.files[0];
+      if (!file) return;
+      if (!confirm('⚠️ 這將覆蓋目前資料，確定匯入嗎？')) { input.value = ''; return; }
+
+      const restoreBtn = document.getElementById('localRestoreBtn');
+      startButtonLoading(restoreBtn, '正在讀取備份...');
       const reader = new FileReader();
       reader.onload = function(evt) {
         try {
@@ -513,22 +610,43 @@
               const useTW = !(d.useTaiwanTime === false || d.useTaiwanTime === 'false');
               localStorage.setItem('useTaiwanTime', String(useTW));
             }
-            alert('✅ 匯入成功，系統將重整'); location.reload();
-          } else alert('❌ 無效備份檔');
-        } catch (err) { alert('❌ 解析失敗'); }
-        e.target.value = '';
-      }; reader.readAsText(file);
+            alert('✅ 匯入成功，系統將重整');
+            location.reload();
+          } else {
+            alert('❌ 無效備份檔：找不到帳目資料。');
+          }
+        } catch (err) {
+          alert('❌ 匯入失敗：' + (err && err.message ? err.message : '備份檔格式錯誤或無法寫入資料。'));
+        } finally {
+          finishButtonLoading(restoreBtn);
+          input.value = '';
+        }
+      };
+      reader.onerror = function() {
+        alert('❌ 無法讀取本機備份檔，請重新選擇檔案。');
+        finishButtonLoading(restoreBtn);
+        input.value = '';
+      };
+      try {
+        reader.readAsText(file);
+      } catch (err) {
+        finishButtonLoading(restoreBtn);
+        input.value = '';
+        alert('❌ 無法讀取本機備份檔：' + (err.message || '未知錯誤'));
+      }
     }
-    
+
     // 🌟 雲端備份：自動與手動共用相同內容與同一個雲端備份檔；同步失敗也照常備份本機快取。
     function backupToDrive(isAuto = false) {
       const btn = document.getElementById('driveBackupBtn');
-      if (!isAuto && btn) { btn.disabled = true; btn.innerText = '⏳ 等待同步...'; }
+      if (!isAuto && btn) startButtonLoading(btn, '等待雲端備份...');
+      if (isAuto) beginSyncStatusLoading('自動雲端備份排隊中...');
 
       return enqueueBackupOperation(async () => {
         let synced = false;
         try {
-          if (!isAuto && btn) btn.innerText = '⏳ 嘗試同步本月...';
+          if (isAuto) updateSyncStatusLoading('自動備份：正在嘗試同步本月帳目...');
+          else updateButtonLoading(btn, '正在更新本月帳目...');
           try {
             synced = await syncData('this_month', {
               silentSuccess: true,
@@ -556,15 +674,17 @@
             }
           };
 
-          if (!isAuto && btn) btn.innerText = '⏳ 雲端備份中...';
+          if (isAuto) updateSyncStatusLoading('正在將帳目與設定寫入雲端備份...');
+          else updateButtonLoading(btn, '正在寫入雲端備份...');
           const response = await fetch(apiUrl, { method: 'POST', body: JSON.stringify(payload) });
           const res = await response.json();
           if (res.status !== 'success') throw new Error(res.message || '雲端拒絕備份請求');
 
           const statusEl = document.getElementById('syncStatus');
           if (statusEl && isAuto && !synced) {
-            statusEl.innerText = '⚠️ 本月同步失敗；仍已完成自動雲端備份（帳目可能較舊，設定已保存）';
-            statusEl.style.color = '#FF9500';
+            updateSyncStatusLoading('⚠️ 本月同步失敗；仍已完成自動雲端備份（帳目可能較舊，設定已保存）', '#FF9500');
+          } else if (isAuto) {
+            updateSyncStatusLoading('✅ 自動雲端備份完成', '#2478D4');
           }
           if (!isAuto) {
             if (synced) alert('✅ 雲端備份成功！已先更新本月帳目。');
@@ -576,10 +696,9 @@
           console.error('雲端備份失敗：', err);
           const statusEl = document.getElementById('syncStatus');
           if (statusEl && isAuto) {
-            statusEl.innerText = synced
+            updateSyncStatusLoading(synced
               ? '⚠️ 自動雲端備份失敗；請檢查網路後手動備份'
-              : '⚠️ 本月同步失敗，且自動雲端備份也失敗；本機資料與設定仍保留，請手動備份';
-            statusEl.style.color = '#FF3B30';
+              : '⚠️ 本月同步失敗，且自動雲端備份也失敗；本機資料與設定仍保留，請手動備份', '#FF3B30');
           }
           if (!isAuto) {
             if (synced) alert('❌ 雲端備份失敗：' + (err.message || '連線錯誤'));
@@ -587,55 +706,45 @@
           }
           return false;
         } finally {
-          if (btn && !isAuto) { btn.innerText = '☁️ 雲端備份'; btn.disabled = false; }
+          if (!isAuto) finishButtonLoading(btn);
+          else endSyncStatusLoading();
         }
       });
     }
 
     // 🌟 從 Google Drive 雲端還原
-    function restoreFromDrive() {
-      if (!confirm(`⚠️ 雲端還原將會覆蓋您手機上目前的資料！\n\n確定要從 Google 雲端載入最新的備份檔嗎？`)) return;
-      
+    async function restoreFromDrive() {
+      if (!confirm('⚠️ 雲端還原將會覆蓋您手機上目前的資料！\n\n確定要從 Google 雲端載入最新的備份檔嗎？')) return;
+
       const btn = document.getElementById('driveRestoreBtn');
-      if (btn) { btn.innerText = "⏳ 雲端下載中..."; btn.disabled = true; }
-      
-      fetch(apiUrl, { 
-        method: "POST", 
-        body: JSON.stringify({ action: "restore_from_cloud", ledger: currentLedger }) 
-      })
-      .then(res => res.json())
-      .then(res => {
-        if (res.status === 'success') {
-          try {
-            const d = JSON.parse(res.data);
-            if (d.ledgerData !== undefined) {
-              localStorage.setItem(getStoreKey('myLedgerData'), typeof d.ledgerData === 'string' ? d.ledgerData : JSON.stringify(d.ledgerData));
-              if (d.syncInfo !== undefined && d.syncInfo !== null) localStorage.setItem(getStoreKey('myLedgerSyncInfo'), d.syncInfo);
-              if (d.customTags !== undefined && d.customTags !== null) localStorage.setItem(getStoreKey('myCustomTags'), d.customTags);
-              if (d.customCategories !== undefined && d.customCategories !== null) localStorage.setItem(getStoreKey('myCustomCategories'), d.customCategories);
-              if (d.useTaiwanTime !== undefined && d.useTaiwanTime !== null) {
-                const useTW = !(d.useTaiwanTime === false || d.useTaiwanTime === 'false');
-                localStorage.setItem('useTaiwanTime', String(useTW));
-              }
-              
-              alert('✅ 雲端還原成功！系統將重新載入。');
-              location.reload();
-            } else {
-              alert('❌ 還原失敗：雲端備份檔格式不符。');
-            }
-          } catch (e) {
-             alert('❌ 解析雲端資料失敗。');
-          }
-        } else {
-          alert("❌ 雲端還原失敗：" + res.message);
+      startButtonLoading(btn, '正在下載雲端備份...');
+      try {
+        const response = await fetch(apiUrl, {
+          method: 'POST',
+          body: JSON.stringify({ action: 'restore_from_cloud', ledger: currentLedger })
+        });
+        const res = await response.json();
+        if (res.status !== 'success') throw new Error(res.message || '雲端沒有可用的備份資料');
+
+        const d = JSON.parse(res.data);
+        if (d.ledgerData === undefined) throw new Error('雲端備份檔格式不符，找不到帳目資料');
+
+        localStorage.setItem(getStoreKey('myLedgerData'), typeof d.ledgerData === 'string' ? d.ledgerData : JSON.stringify(d.ledgerData));
+        if (d.syncInfo !== undefined && d.syncInfo !== null) localStorage.setItem(getStoreKey('myLedgerSyncInfo'), d.syncInfo);
+        if (d.customTags !== undefined && d.customTags !== null) localStorage.setItem(getStoreKey('myCustomTags'), d.customTags);
+        if (d.customCategories !== undefined && d.customCategories !== null) localStorage.setItem(getStoreKey('myCustomCategories'), d.customCategories);
+        if (d.useTaiwanTime !== undefined && d.useTaiwanTime !== null) {
+          const useTW = !(d.useTaiwanTime === false || d.useTaiwanTime === 'false');
+          localStorage.setItem('useTaiwanTime', String(useTW));
         }
-      })
-      .catch(err => {
-        alert("❌ 連線錯誤，無法從雲端還原！");
-      })
-      .finally(() => {
-        if (btn) { btn.innerText = "☁️ 雲端還原"; btn.disabled = false; }
-      });
+
+        alert('✅ 雲端還原成功！系統將重新載入。');
+        location.reload();
+      } catch (err) {
+        alert('❌ 雲端還原失敗：' + (err && err.message ? err.message : '連線錯誤，無法從雲端還原。'));
+      } finally {
+        finishButtonLoading(btn);
+      }
     }
 
     window.onload = function() {
@@ -777,13 +886,63 @@
     }
 
     // ======== 🔄 同步與網路請求 ========
-    function submitData() {
-      const data = { action: "add", ledger: currentLedger, date: document.getElementById('dateInput').value, category: document.getElementById('categoryInput').value, item: document.getElementById('itemInput').value, amount: document.getElementById('amountInput').value };
-      if (!data.item || !data.amount) return alert("請填妥資料！");
-      document.getElementById('syncStatus').innerText = "⏳ 正在儲存到雲端...";
-      fetch(apiUrl, { method: "POST", body: JSON.stringify(data) }).then(res => res.json()).then(res => {
-        if (res.status === 'success') { alert("✅ 記帳成功！"); document.getElementById('itemInput').value = ''; document.getElementById('amountInput').value = ''; document.getElementById('dateInput').value = getTodayDateString(localStorage.getItem('useTaiwanTime') !== 'false'); document.getElementById('syncStatus').innerText = "⚠ 雲端有新資料，建議同步"; } else alert("❌ 錯誤：" + res.message);
-      });
+    async function submitData() {
+      const btn = document.getElementById('submitDataBtn');
+      if (btn && btn.disabled) return;
+      const data = {
+        action: 'add',
+        ledger: currentLedger,
+        date: document.getElementById('dateInput').value,
+        category: document.getElementById('categoryInput').value,
+        item: document.getElementById('itemInput').value,
+        amount: document.getElementById('amountInput').value
+      };
+      if (!data.item || !data.amount) return alert('請填妥資料！');
+
+      const statusEl = document.getElementById('syncStatus');
+      startButtonLoading(btn, '新增中...');
+      if (btn) {
+        btn.classList.add('has-inline-spinner');
+        btn.setAttribute('aria-busy', 'true');
+        btn.innerHTML = '<span class="button-spinner" aria-hidden="true"></span><span>新增中...</span>';
+      }
+      if (statusEl) {
+        statusEl.innerText = '正在儲存新帳目到雲端...';
+        statusEl.style.color = '#FF9500';
+      }
+      try {
+        const response = await fetch(apiUrl, { method: 'POST', body: JSON.stringify(data) });
+        const res = await response.json();
+        if (res.status === 'success') {
+          document.getElementById('itemInput').value = '';
+          document.getElementById('amountInput').value = '';
+          document.getElementById('dateInput').value = getTodayDateString(localStorage.getItem('useTaiwanTime') !== 'false');
+          if (statusEl) {
+            statusEl.innerText = '⚠️ 雲端有新資料，建議同步';
+            statusEl.style.color = '#FF9500';
+          }
+          alert('✅ 記帳成功！');
+        } else {
+          if (statusEl) {
+            statusEl.innerText = '❌ 新增帳目失敗，尚未確認寫入成功';
+            statusEl.style.color = '#FF3B30';
+          }
+          alert('❌ 新增帳目失敗：' + (res.message || '雲端未能新增這筆帳目'));
+        }
+      } catch (err) {
+        console.error('新增帳目失敗：', err);
+        if (statusEl) {
+          statusEl.innerText = '⚠️ 新增帳目連線中斷，請先同步或檢查雲端，確認沒有新增成功後再重試';
+          statusEl.style.color = '#FF3B30';
+        }
+        alert('⚠️ 連線中斷，無法確認這筆帳目是否已寫入雲端。請先執行同步或檢查雲端帳目，確認沒有新增成功後再重試，以免重複記帳。');
+      } finally {
+        finishButtonLoading(btn);
+        if (btn) {
+          btn.classList.remove('has-inline-spinner');
+          btn.removeAttribute('aria-busy');
+        }
+      }
     }
 
     async function syncData(mode, options = {}) {
@@ -791,8 +950,6 @@
       let queue = [];
       if (mode === 'this_month') {
         queue.push({ year: currentTwYear.toString(), month: (new Date().getMonth() + 1) + '月' });
-        const statusEl = document.getElementById('syncStatus');
-        if (statusEl) statusEl.innerText = options.forBackup ? '🔄 備份前正在更新本月帳目...' : '🔄 本月同步中...';
       } else if (mode === 'custom') {
         const y = document.getElementById('syncYearSelect').value;
         const m = document.getElementById('syncMonthSelect').value;
@@ -808,7 +965,29 @@
         }
       }
       if (!queue.length) return false;
-      return await executeSyncQueue(queue, mode, options);
+      if (syncOperationInProgress) {
+        // 備份若遇到使用者已啟動的同步，先等該作業結束，再重新嘗試備份前同步，避免拍到同步中的舊快取。
+        if (options.forBackup && syncOperationPromise) {
+          try { await syncOperationPromise; } catch (err) { /* 後續仍會重新嘗試備份前同步 */ }
+          return await syncData(mode, options);
+        }
+        if (!options.quietErrors) alert('目前已有同步作業正在進行，請等完成後再操作。');
+        return false;
+      }
+
+      syncOperationInProgress = true;
+      setSyncButtonsBusy(mode, true, options.forBackup === true);
+      const operationPromise = (async () => {
+        try {
+          return await executeSyncQueue(queue, mode, options);
+        } finally {
+          syncOperationInProgress = false;
+          setSyncButtonsBusy(mode, false, options.forBackup === true);
+          if (syncOperationPromise === operationPromise) syncOperationPromise = null;
+        }
+      })();
+      syncOperationPromise = operationPromise;
+      return await operationPromise;
     }
 
     async function executeSyncQueue(queue, mode, options = {}) {
@@ -991,8 +1170,55 @@
 
     function openEditModal(itemStr) { const i = JSON.parse(decodeURIComponent(itemStr)); document.getElementById('editMonth').value = i.month; document.getElementById('editOldCategory').value = i.category; document.getElementById('editOldDetail').value = i.detail; document.getElementById('editOldAmount').value = i.amount; document.getElementById('editMonthDisplay').innerText = `📍 ${i.month}`; document.getElementById('editDetailInput').value = i.detail; document.getElementById('editAmountInput').value = i.amount; document.getElementById('editCategoryInput').innerHTML = (localStorage.getItem(getStoreKey('myCustomCategories'))||defaultCategories).split(',').filter(t=>t.trim()!=='').map(c => `<option value="${c}">${c}</option>`).join(''); document.getElementById('editCategoryInput').value = i.category; document.getElementById('editModal').style.display = 'flex'; }
     function closeEditModal() { document.getElementById('editModal').style.display = 'none'; }
-    function saveEditRecord() { const d = { action:'edit', ledger:currentLedger, month:document.getElementById('editMonth').value, oldCategory:document.getElementById('editOldCategory').value, oldDetail:document.getElementById('editOldDetail').value, oldAmount:document.getElementById('editOldAmount').value, newCategory:document.getElementById('editCategoryInput').value, newDetail:document.getElementById('editDetailInput').value, newAmount:document.getElementById('editAmountInput').value }; if(!d.newDetail||!d.newAmount) return alert("請填寫完整"); closeEditModal(); fetch(apiUrl, { method: "POST", body: JSON.stringify(d) }).then(res => res.json()).then(res => { if(res.status==='success') { let idx = localLedgerData.findIndex(item => item.month===d.month && item.category===d.oldCategory && item.detail===d.oldDetail && item.amount===d.oldAmount); if (idx!==-1) { localLedgerData[idx].category=d.newCategory; localLedgerData[idx].detail=d.newDetail; localLedgerData[idx].amount=d.newAmount; localStorage.setItem(getStoreKey('myLedgerData'), JSON.stringify(localLedgerData)); filterLocalData(); } alert("✅ 修改成功"); } }); }
-    function confirmDeleteFromEdit() {
+    async function saveEditRecord() {
+      const saveBtn = document.getElementById('saveEditBtn');
+      const deleteBtn = document.getElementById('deleteEditBtn');
+      const cancelBtn = document.getElementById('editCancelBtn');
+      if (saveBtn && saveBtn.disabled) return;
+      const d = {
+        action: 'edit', ledger: currentLedger,
+        month: document.getElementById('editMonth').value,
+        oldCategory: document.getElementById('editOldCategory').value,
+        oldDetail: document.getElementById('editOldDetail').value,
+        oldAmount: document.getElementById('editOldAmount').value,
+        newCategory: document.getElementById('editCategoryInput').value,
+        newDetail: document.getElementById('editDetailInput').value,
+        newAmount: document.getElementById('editAmountInput').value
+      };
+      if (!d.newDetail || !d.newAmount) return alert('請填寫完整');
+
+      startButtonLoading(saveBtn, '正在儲存修改...');
+      if (deleteBtn) deleteBtn.disabled = true;
+      if (cancelBtn) cancelBtn.disabled = true;
+      try {
+        const response = await fetch(apiUrl, { method: 'POST', body: JSON.stringify(d) });
+        const res = await response.json();
+        if (res.status !== 'success') throw new Error(res.message || '雲端未能儲存修改');
+
+        const idx = localLedgerData.findIndex(item => item.month === d.month && item.category === d.oldCategory && item.detail === d.oldDetail && item.amount === d.oldAmount);
+        if (idx !== -1) {
+          localLedgerData[idx].category = d.newCategory;
+          localLedgerData[idx].detail = d.newDetail;
+          localLedgerData[idx].amount = d.newAmount;
+          localStorage.setItem(getStoreKey('myLedgerData'), JSON.stringify(localLedgerData));
+          filterLocalData();
+        }
+        closeEditModal();
+        alert('✅ 修改成功');
+      } catch (err) {
+        alert('❌ 修改失敗：' + (err && err.message ? err.message : '連線錯誤，請確認雲端狀態後再試。'));
+      } finally {
+        finishButtonLoading(saveBtn);
+        if (deleteBtn) deleteBtn.disabled = false;
+        if (cancelBtn) cancelBtn.disabled = false;
+      }
+    }
+
+    async function confirmDeleteFromEdit() {
+      const deleteBtn = document.getElementById('deleteEditBtn');
+      const saveBtn = document.getElementById('saveEditBtn');
+      const cancelBtn = document.getElementById('editCancelBtn');
+      if (deleteBtn && deleteBtn.disabled) return;
       const d = {
         action: 'delete', ledger: currentLedger,
         month: document.getElementById('editMonth').value,
@@ -1000,29 +1226,36 @@
         detail: document.getElementById('editOldDetail').value,
         amount: document.getElementById('editOldAmount').value
       };
-      closeEditModal();
-      if (!confirm("確定刪除此紀錄？")) return;
-      fetch(apiUrl, { method: "POST", body: JSON.stringify(d) })
-        .then(res => res.json())
-        .then(res => {
-          if (res.status === 'success') {
-            // 不使用 filter 一次移除所有同名項目；只移除第一筆完全符合條件的本機紀錄。
-            const idx = localLedgerData.findIndex(item =>
-              String(item.month || '') === String(d.month) &&
-              String(item.category || '') === String(d.category) &&
-              String(item.detail || '') === String(d.detail) &&
-              String(item.amount == null ? '' : item.amount) === String(d.amount)
-            );
-            if (idx !== -1) localLedgerData.splice(idx, 1);
-            localStorage.setItem(getStoreKey('myLedgerData'), JSON.stringify(localLedgerData));
-            filterLocalData();
-            if (recordFilterHasRun) renderFilteredRecords(false);
-            alert("✅ 刪除成功");
-          } else {
-            alert("❌ 刪除失敗：" + (res.message || '雲端未能刪除紀錄'));
-          }
-        })
-        .catch(() => alert("❌ 連線錯誤，刪除失敗。"));
+      if (!confirm('確定刪除此紀錄？')) return;
+
+      startButtonLoading(deleteBtn, '正在刪除紀錄...');
+      if (saveBtn) saveBtn.disabled = true;
+      if (cancelBtn) cancelBtn.disabled = true;
+      try {
+        const response = await fetch(apiUrl, { method: 'POST', body: JSON.stringify(d) });
+        const res = await response.json();
+        if (res.status !== 'success') throw new Error(res.message || '雲端未能刪除紀錄');
+
+        // 不使用 filter 一次移除所有同名項目；只移除第一筆完全符合條件的本機紀錄。
+        const idx = localLedgerData.findIndex(item =>
+          String(item.month || '') === String(d.month) &&
+          String(item.category || '') === String(d.category) &&
+          String(item.detail || '') === String(d.detail) &&
+          String(item.amount == null ? '' : item.amount) === String(d.amount)
+        );
+        if (idx !== -1) localLedgerData.splice(idx, 1);
+        localStorage.setItem(getStoreKey('myLedgerData'), JSON.stringify(localLedgerData));
+        filterLocalData();
+        if (recordFilterHasRun) renderFilteredRecords(false);
+        closeEditModal();
+        alert('✅ 刪除成功');
+      } catch (err) {
+        alert('❌ 刪除失敗：' + (err && err.message ? err.message : '連線錯誤，請確認雲端狀態後再試。'));
+      } finally {
+        finishButtonLoading(deleteBtn);
+        if (saveBtn) saveBtn.disabled = false;
+        if (cancelBtn) cancelBtn.disabled = false;
+      }
     }
 
     // ======== 分類標籤管理與計算機 ========
