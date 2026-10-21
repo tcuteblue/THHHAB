@@ -100,12 +100,11 @@
     .record-filter-grid .filter-category { grid-column: 1 / -1; }
     .record-filter-grid label { margin-top: 8px; font-size: 16px; }
     .record-filter-grid select { font-size: 17px; padding: 12px 10px; }
-    .filter-hint { color: #6b7280; font-size: 14px; line-height: 1.5; margin: 6px 0 12px; }
     .filtered-summary { display: none; margin-top: 14px; padding: 12px; border-radius: 8px; background: #eef5ff; color: #1756a9; font-weight: bold; line-height: 1.5; white-space: pre-line; }
 
-    .multi-select-bar { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: rgba(30, 30, 30, 0.95); backdrop-filter: blur(10px); color: white; padding: 15px 25px; border-radius: 30px; box-shadow: 0 8px 20px rgba(0,0,0,0.3); z-index: 2000; display: none; justify-content: space-between; align-items: center; width: 85%; max-width: 400px; animation: slideUp 0.3s ease-out; font-size: 18px; }
+    .multi-select-bar { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: rgba(30, 30, 30, 0.95); backdrop-filter: blur(10px); color: white; padding: 12px 14px; border-radius: 24px; box-shadow: 0 8px 20px rgba(0,0,0,0.3); z-index: 2000; display: none; justify-content: space-between; align-items: center; width: calc(100% - 28px); max-width: 430px; box-sizing: border-box; gap: 8px; animation: slideUp 0.3s ease-out; font-size: 16px; }
     @keyframes slideUp { from { bottom: -50px; opacity: 0; } to { bottom: 20px; opacity: 1; } }
-    .multi-select-bar button { margin: 0; padding: 8px 15px; font-size: 16px; background: rgba(255,255,255,0.2); width: auto; }
+    .multi-select-bar button { margin: 0; padding: 9px 10px; font-size: 14px; line-height: 1.2; background: rgba(255,255,255,0.2); width: auto; white-space: nowrap; }
 
     .chart-mode-bar, .chart-type-bar { display: flex; background: #eee; border-radius: 8px; overflow: hidden; margin-bottom: 15px; }
     .btn-mode, .btn-type { flex: 1; text-align: center; padding: 10px; font-weight: bold; color: #666; cursor: pointer; font-size: 16px; transition: 0.2s; }
@@ -167,13 +166,13 @@
       <label>🏷️ 分類</label>
       <select id="categoryInput"></select>
       
-      <label>💰 金額 (元)</label>
-      <input type="text" id="amountInput" placeholder="🧮 點擊輸入金額..." onclick="openCalcModal('amountInput')" readonly style="cursor: pointer; background: #F4F8FF; color: #007AFF; font-weight: bold; text-align: center; border-color: #007AFF;">
-      
       <label>📝 項目說明</label>
       <div class="quick-tags" id="quickTagsContainer"></div>
       <input type="text" id="itemInput" placeholder="例如：晚餐 石二鍋" list="historySuggestions">
       <datalist id="historySuggestions"></datalist>
+      
+      <label>💰 金額 (元)</label>
+      <input type="text" id="amountInput" placeholder="🧮 點擊輸入金額..." onclick="openCalcModal('amountInput')" readonly style="cursor: pointer; background: #F4F8FF; color: #007AFF; font-weight: bold; text-align: center; border-color: #007AFF;">
       
       <button id="submitDataBtn" type="button" onclick="submitData()">新增帳目</button>
 
@@ -194,7 +193,7 @@
 
       <div id="periodSearchPanel" style="display:none;">
         <h3 style="margin: 0 0 6px; font-size: 20px;">📅 依年月與分類檢視</h3>
-        <p class="filter-hint">選擇年度、月份與記帳分類，即可列出符合條件的所有明細。這裡顯示的是本機已同步的資料；若剛新增的帳目尚未出現，請先到「設定」執行同步。</p>
+        
         <div class="record-filter-grid">
           <div>
             <label for="recordFilterYear" style="margin-top:0;">年度</label>
@@ -309,6 +308,7 @@
   <!-- 浮動列與 Modals -->
   <div class="multi-select-bar" id="multiSelectBar">
     <span>已選取: <b id="selectCount" style="color:#4BC0C0; font-size:20px;">0</b> 筆<br>總計: $ <b id="selectSum" style="color:#FFCE56; font-size:20px;">0</b></span>
+    <button id="selectAllBtn" type="button" onclick="selectAllVisible()">☑️ 全選</button>
     <button onclick="exitMultiSelect()">❌ 退出</button>
   </div>
 
@@ -376,9 +376,6 @@
           <button class="key" onclick="kp('.')">.</button>
       </div>
 
-      <div class="modal-actions" style="margin-top: 15px;">
-        <button class="btn-cancel" onclick="closeCalcModal()">❌ 取消關閉</button>
-      </div>
     </div>
   </div>
 
@@ -845,6 +842,13 @@
       }[char]));
     }
 
+    function getRecordSelectionKey(item) {
+      const index = (localLedgerData || []).indexOf(item);
+      return index >= 0
+        ? `record:${index}`
+        : `record:${JSON.stringify([item.month, item.category, item.detail, item.amount])}`;
+    }
+
     function renderFilteredRecords(runByUser = true) {
       if (runByUser) recordFilterHasRun = true;
       const resultBox = document.getElementById('filteredResultBox');
@@ -858,6 +862,7 @@
         summary.style.display = 'block';
         summary.innerText = '目前沒有本機帳目資料，請先到「設定」執行雲端同步。';
         resultBox.innerHTML = '';
+        updateSelectAllButtonLabel();
         return;
       }
 
@@ -873,19 +878,25 @@
 
       if (filtered.length === 0) {
         resultBox.innerHTML = '<div class="result-item" style="text-align:center; color:#777;">這個年月與分類沒有找到明細。</div>';
+        updateSelectAllButtonLabel();
         return;
       }
 
-      resultBox.innerHTML = filtered.map(item => {
+      resultBox.innerHTML = filtered.map((item, index) => {
         const categoryHtml = item.category ? `<span class="result-category">${escapeHtml(item.category)}</span>` : '';
         const detail = escapeHtml(item.detail || '（沒有項目說明）');
         const monthText = escapeHtml(item.month || '');
-        const amount = escapeHtml(item.amount == null ? '0' : item.amount);
-        return `<div class="result-item" style="display:flex; justify-content:space-between; align-items:flex-start; gap:10px;">
-          <div style="flex:1; min-width:0;"><div class="result-month">📍 ${monthText}</div><div style="font-size:17px; line-height:1.5; overflow-wrap:anywhere;">${categoryHtml} ${detail}</div></div>
-          <div class="result-amount" style="text-align:right; flex-shrink:0; margin-top:0;">$ ${amount}</div>
+        const amountText = escapeHtml(item.amount == null ? '0' : item.amount);
+        const key = getRecordSelectionKey(item);
+        const keyAttr = escapeHtml(key);
+        const amt = parseFloat(String(item.amount == null ? '0' : item.amount).replace(/,/g, '')) || 0;
+        const selected = selectedItemsMap.has(key);
+        return `<div id="period-res-${index}" class="result-item" data-select-key="${keyAttr}" data-select-amount="${amt}" onclick="periodItemClickFromElement(this)" style="display:flex; justify-content:space-between; align-items:flex-start; gap:10px; cursor:pointer; ${selected ? 'background:#E3F2FD;border-left:6px solid #007AFF;' : 'border-left:4px solid #34C759;'}">
+          <div style="flex:1; min-width:0; pointer-events:none;"><div class="result-month">📍 ${monthText}</div><div style="font-size:17px; line-height:1.5; overflow-wrap:anywhere;">${categoryHtml} ${detail}</div></div>
+          <div class="result-amount" style="text-align:right; flex-shrink:0; margin-top:0; pointer-events:none;">$ ${amountText}</div>
         </div>`;
       }).join('');
+      updateSelectAllButtonLabel();
     }
 
     // ======== 🔄 同步與網路請求 ========
@@ -1141,6 +1152,7 @@
 
     // ======== 🔍 搜尋引擎 ========
     let searchDisplayLimit = 100;
+    let currentSearchResults = [];
 
     function loadLocalData() {
       const stored = localStorage.getItem(getStoreKey('myLedgerData'));
@@ -1173,65 +1185,170 @@
     function renderSearchResults() {
       const keywordInput = document.getElementById('searchInput').value.trim().toLowerCase();
       const resultBox = document.getElementById('resultBox');
-      
-      if (!keywordInput) { 
-        resultBox.innerHTML = '<div class="result-item" style="text-align:center; color:#888; background:transparent; border:none; box-shadow:none; font-size:16px;">👆 支援多關鍵字搜尋 (例：112年 晚餐)</div>'; 
-        return; 
+
+      if (!keywordInput) {
+        currentSearchResults = [];
+        resultBox.innerHTML = '<div class="result-item" style="text-align:center; color:#888; background:transparent; border:none; box-shadow:none; font-size:16px;">👆 支援多關鍵字搜尋 (例：112年 晚餐)</div>';
+        updateSelectAllButtonLabel();
+        return;
       }
 
       const keywords = keywordInput.split(/\s+/);
-      let filtered = localLedgerData.filter(i => i.category !== "系統彙總"); 
-      
+      let filtered = localLedgerData.filter(i => i && i.category !== '系統彙總');
       filtered = filtered.filter(i => {
-        const combinedStr = `${i.month} ${i.category} ${i.detail} ${i.amount}`.toLowerCase();
-        return keywords.every(kw => combinedStr.includes(kw)); 
-      });
-      
-      filtered.sort((a, b) => {
-        const getVal = obj => { let m = obj.detail.match(/^(\d{2,3})\/(\d{1,2})\/(\d{1,2})/); if(m) return m[1]*10000 + m[2]*100 + parseInt(m[3]); m = obj.month.match(/(\d+)年\s*(\d+)月/); return m ? m[1]*10000 + m[2]*100 : 0; };
-        return getVal(b) - getVal(a);
+        const combinedStr = `${i.month || ''} ${i.category || ''} ${i.detail || ''} ${i.amount || ''}`.toLowerCase();
+        return keywords.every(kw => combinedStr.includes(kw));
       });
 
+      filtered.sort((a, b) => getRecordSortValue(b) - getRecordSortValue(a));
+      currentSearchResults = filtered.slice();
       const totalCount = filtered.length;
       const isOverLimit = totalCount > searchDisplayLimit;
-      if (isOverLimit) { filtered = filtered.slice(0, searchDisplayLimit); }
+      if (isOverLimit) filtered = filtered.slice(0, searchDisplayLimit);
 
       if (filtered.length === 0) {
         resultBox.innerHTML = '<div class="result-item" style="text-align:center;">找不到符合的紀錄 🥲</div>';
       } else {
         let html = filtered.map((item, index) => {
-          const safe = encodeURIComponent(JSON.stringify(item)); const domId = `res-${index}`; const amt = parseFloat(item.amount.toString().replace(/,/g, '')) || 0; const isSel = selectedItemsMap.has(`${item.month}|${item.category}|${item.detail}|${item.amount}`);
-          return `<div id="${domId}" class="result-item" style="display: flex; justify-content: space-between; align-items: center; cursor: pointer; user-select: none; ${isSel ? "background: #E3F2FD; border-left: 6px solid #007AFF;" : "border-left: 4px solid #34C759;"}" oncontextmenu="return false;" ontouchstart="startPress(event, '${domId}', '${item.month}|${item.category}|${item.detail}|${item.amount}', ${amt})" ontouchend="endPress(event)" onmousedown="startPress(event, '${domId}', '${item.month}|${item.category}|${item.detail}|${item.amount}', ${amt})" onmouseup="endPress(event)" onmouseleave="endPress(event)" onclick="itemClick(event, '${domId}', '${item.month}|${item.category}|${item.detail}|${item.amount}', '${safe}')">
-            <div style="flex: 1; pointer-events: none;"><div class="result-month">📍 ${item.month}</div><div style="font-size: 18px;">${item.category ? `<span class="result-category">${item.category}</span>` : ''} ${item.detail}</div></div>
-            <div class="result-amount" style="text-align: right; pointer-events: none;">$ ${item.amount}</div></div>`;
+          const safeItem = encodeURIComponent(JSON.stringify(item)).replace(/'/g, '%27');
+          const domId = `res-${index}`;
+          const amount = parseFloat(String(item.amount == null ? '0' : item.amount).replace(/,/g, '')) || 0;
+          const key = getRecordSelectionKey(item);
+          const selected = selectedItemsMap.has(key);
+          return `<div id="${domId}" class="result-item" data-select-key="${escapeHtml(key)}" data-select-amount="${amount}" data-item="${escapeHtml(safeItem)}" style="display:flex; justify-content:space-between; align-items:center; cursor:pointer; user-select:none; ${selected ? 'background:#E3F2FD; border-left:6px solid #007AFF;' : 'border-left:4px solid #34C759;'}" oncontextmenu="return false;" ontouchstart="startPress(event, this)" ontouchend="endPress(event)" onmousedown="startPress(event, this)" onmouseup="endPress(event)" onmouseleave="endPress(event)" onclick="itemClickFromElement(event, this)">
+            <div style="flex:1; pointer-events:none;"><div class="result-month">📍 ${escapeHtml(item.month || '')}</div><div style="font-size:18px;">${item.category ? `<span class="result-category">${escapeHtml(item.category)}</span>` : ''} ${escapeHtml(item.detail || '')}</div></div>
+            <div class="result-amount" style="text-align:right; pointer-events:none;">$ ${escapeHtml(item.amount == null ? '0' : item.amount)}</div></div>`;
         }).join('');
-        
+
         if (isOverLimit) {
-          html += `<div style="text-align:center; padding: 10px 0 20px 0;">
+          html += `<div style="text-align:center; padding:10px 0 20px 0;">
                      <button onclick="loadMoreResults()" style="background:#f0f2f5; color:#007AFF; border:2px solid #007AFF; margin-top:0; padding:12px 25px; font-size:18px; font-weight:bold; border-radius:25px; width:auto; cursor:pointer;">
                        👇 載入更多 (還有 ${totalCount - searchDisplayLimit} 筆)
                      </button>
                    </div>`;
         } else if (totalCount > 100) {
-          html += `<div style="text-align:center; color:#888; font-size:14px; margin-top:15px; padding-bottom: 20px;">✅ 已顯示全部 ${totalCount} 筆結果</div>`;
+          html += `<div style="text-align:center; color:#888; font-size:14px; margin-top:15px; padding-bottom:20px;">✅ 已顯示全部 ${totalCount} 筆結果</div>`;
         }
         resultBox.innerHTML = html;
       }
+      updateSelectAllButtonLabel();
     }
 
-    // ======== 項目互動 (編輯、刪除、長按) ========
-    let pressTimer = null; let isLongPress = false; let multiSelectMode = false; let selectedItemsMap = new Map(); 
-    function startPress(e, domId, uniqueKey, amount) { isLongPress = false; pressTimer = setTimeout(() => { isLongPress = true; if (navigator.vibrate) navigator.vibrate(50); if (!multiSelectMode) { multiSelectMode = true; document.getElementById('multiSelectBar').style.display = 'flex'; } toggleSelection(domId, uniqueKey, amount); }, 500); }
-    function endPress(e) { if (pressTimer) { clearTimeout(pressTimer); pressTimer = null; } }
-    function itemClick(e, domId, uniqueKey, itemStr) { if (isLongPress) return; if (multiSelectMode) { toggleSelection(domId, uniqueKey, parseFloat(JSON.parse(decodeURIComponent(itemStr)).amount.toString().replace(/,/g, '')) || 0); } else { openEditModal(itemStr); } }
-    function toggleSelection(domId, uniqueKey, amount) {
-      const el = document.getElementById(domId);
-      if (selectedItemsMap.has(uniqueKey)) { selectedItemsMap.delete(uniqueKey); if (el) { el.style.backgroundColor = ""; el.style.borderLeft = "4px solid #34C759"; } } 
-      else { selectedItemsMap.set(uniqueKey, amount); if (el) { el.style.backgroundColor = "#E3F2FD"; el.style.borderLeft = "6px solid #007AFF"; } }
-      let sum = 0; selectedItemsMap.forEach(v => sum += v);
-      document.getElementById('selectCount').innerText = selectedItemsMap.size; document.getElementById('selectSum').innerText = sum.toLocaleString();
+    // ======== 項目互動 (編輯、刪除、長按、多選與加總) ========
+    let pressTimer = null;
+    let isLongPress = false;
+    let multiSelectMode = false;
+    let selectedItemsMap = new Map();
+
+    function startPress(e, element) {
+      isLongPress = false;
+      if (pressTimer) clearTimeout(pressTimer);
+      pressTimer = setTimeout(() => {
+        isLongPress = true;
+        if (navigator.vibrate) navigator.vibrate(50);
+        if (!multiSelectMode) {
+          multiSelectMode = true;
+          document.getElementById('multiSelectBar').style.display = 'flex';
+        }
+        toggleSelection(element.id, element.dataset.selectKey, Number(element.dataset.selectAmount) || 0);
+      }, 500);
     }
-    function exitMultiSelect() { multiSelectMode = false; selectedItemsMap.clear(); document.getElementById('multiSelectBar').style.display = 'none'; filterLocalData(); }
+
+    function endPress() {
+      if (pressTimer) { clearTimeout(pressTimer); pressTimer = null; }
+    }
+
+    function itemClickFromElement(e, element) {
+      if (isLongPress) return;
+      if (multiSelectMode) {
+        toggleSelection(element.id, element.dataset.selectKey, Number(element.dataset.selectAmount) || 0);
+      } else {
+        openEditModal(element.dataset.item);
+      }
+    }
+
+    function periodItemClickFromElement(element) {
+      if (!multiSelectMode) {
+        multiSelectMode = true;
+        document.getElementById('multiSelectBar').style.display = 'flex';
+      }
+      toggleSelection(element.id, element.dataset.selectKey, Number(element.dataset.selectAmount) || 0);
+    }
+
+    function toggleSelection(domId, uniqueKey, amount) {
+      if (!uniqueKey) return;
+      const el = document.getElementById(domId);
+      if (selectedItemsMap.has(uniqueKey)) {
+        selectedItemsMap.delete(uniqueKey);
+        if (el) { el.style.backgroundColor = ''; el.style.borderLeft = '4px solid #34C759'; }
+      } else {
+        selectedItemsMap.set(uniqueKey, Number(amount) || 0);
+        if (el) { el.style.backgroundColor = '#E3F2FD'; el.style.borderLeft = '6px solid #007AFF'; }
+      }
+      updateSelectionSummary();
+    }
+
+    function getActiveResultBox() {
+      const periodActive = document.getElementById('periodSearchPanel').style.display !== 'none';
+      return document.getElementById(periodActive ? 'filteredResultBox' : 'resultBox');
+    }
+
+    function updateSelectAllButtonLabel() {
+      const button = document.getElementById('selectAllBtn');
+      if (!button) return;
+      const box = getActiveResultBox();
+      const rows = box ? Array.from(box.querySelectorAll('.result-item[data-select-key]')) : [];
+      button.textContent = rows.length > 0 && rows.every(row => selectedItemsMap.has(row.dataset.selectKey)) ? '取消全選' : '☑️ 全選';
+    }
+
+    function selectAllVisible() {
+      const periodActive = document.getElementById('periodSearchPanel').style.display !== 'none';
+      if (!periodActive) {
+        if (!document.getElementById('searchInput').value.trim()) return;
+        // 關鍵字搜尋採分批顯示；全選時先展開全部符合項目，再一併統計。
+        searchDisplayLimit = Math.max(100, currentSearchResults.length);
+        renderSearchResults();
+      }
+
+      const box = document.getElementById(periodActive ? 'filteredResultBox' : 'resultBox');
+      const rows = box ? Array.from(box.querySelectorAll('.result-item[data-select-key]')) : [];
+      if (!rows.length) return;
+      if (!multiSelectMode) {
+        multiSelectMode = true;
+        document.getElementById('multiSelectBar').style.display = 'flex';
+      }
+
+      const shouldDeselect = rows.every(row => selectedItemsMap.has(row.dataset.selectKey));
+      rows.forEach(row => {
+        const key = row.dataset.selectKey;
+        if (shouldDeselect) {
+          selectedItemsMap.delete(key);
+          row.style.backgroundColor = '';
+          row.style.borderLeft = '4px solid #34C759';
+        } else {
+          selectedItemsMap.set(key, Number(row.dataset.selectAmount) || 0);
+          row.style.backgroundColor = '#E3F2FD';
+          row.style.borderLeft = '6px solid #007AFF';
+        }
+      });
+      updateSelectionSummary();
+    }
+
+    function updateSelectionSummary() {
+      let sum = 0;
+      selectedItemsMap.forEach(value => sum += value);
+      document.getElementById('selectCount').innerText = selectedItemsMap.size;
+      document.getElementById('selectSum').innerText = sum.toLocaleString();
+      updateSelectAllButtonLabel();
+    }
+
+    function exitMultiSelect() {
+      multiSelectMode = false;
+      selectedItemsMap.clear();
+      document.getElementById('multiSelectBar').style.display = 'none';
+      filterLocalData();
+      if (recordFilterHasRun) renderFilteredRecords(false);
+    }
 
     function openEditModal(itemStr) { const i = JSON.parse(decodeURIComponent(itemStr)); document.getElementById('editMonth').value = i.month; document.getElementById('editOldCategory').value = i.category; document.getElementById('editOldDetail').value = i.detail; document.getElementById('editOldAmount').value = i.amount; document.getElementById('editMonthDisplay').innerText = `📍 ${i.month}`; document.getElementById('editDetailInput').value = i.detail; document.getElementById('editAmountInput').value = i.amount; document.getElementById('editCategoryInput').innerHTML = (localStorage.getItem(getStoreKey('myCustomCategories'))||defaultCategories).split(',').filter(t=>t.trim()!=='').map(c => `<option value="${c}">${c}</option>`).join(''); document.getElementById('editCategoryInput').value = i.category; document.getElementById('editModal').style.display = 'flex'; }
     function closeEditModal() { document.getElementById('editModal').style.display = 'none'; }
