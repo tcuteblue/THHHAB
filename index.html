@@ -520,7 +520,10 @@
       }
     }
 
-    function getStoreKey(keyName) { return currentLedger === 'home' ? keyName : keyName + '_studio'; }
+    function getStoreKeyForLedger(ledgerName, keyName) {
+      return ledgerName === 'home' ? keyName : keyName + '_studio';
+    }
+    function getStoreKey(keyName) { return getStoreKeyForLedger(currentLedger, keyName); }
 
     function toggleLedger() {
       currentLedger = currentLedger === 'home' ? 'studio' : 'home';
@@ -886,12 +889,65 @@
     }
 
     // ======== 🔄 同步與網路請求 ========
+    // 雲端新增成功後，將新帳目立即補入對應帳本的本機快取。
+    // 這只代表這一筆已更新；其他裝置或雲端工作表的變更仍要靠同步取得。
+    function updateLocalCacheAfterAdd(data, ledgerName) {
+      const dataKey = getStoreKeyForLedger(ledgerName, 'myLedgerData');
+      const syncInfoKey = getStoreKeyForLedger(ledgerName, 'myLedgerSyncInfo');
+      const stored = localStorage.getItem(dataKey);
+      let cachedData = [];
+      if (stored) {
+        cachedData = JSON.parse(stored);
+        if (!Array.isArray(cachedData)) throw new Error('本機帳目快取不是有效的清單');
+      }
+
+      const dateParts = String(data.date || '').split('-').map(Number);
+      if (dateParts.length !== 3 || dateParts.some(value => !Number.isFinite(value) || value <= 0)) {
+        throw new Error('新增帳目的日期格式不正確');
+      }
+      const [gregorianYear, monthNumber, dayNumber] = dateParts;
+      const rocYear = gregorianYear - 1911;
+      if (rocYear <= 0 || monthNumber > 12 || dayNumber > 31) throw new Error('新增帳目的日期超出有效範圍');
+
+      // 與同步資料使用相同欄位及月份／日期格式。故意直接 append，不去重，避免誤刪使用者有意輸入的相同帳目。
+      const newRecord = {
+        month: `${rocYear}年 ${monthNumber}月`,
+        category: String(data.category || ''),
+        detail: `${rocYear}/${String(monthNumber).padStart(2, '0')}/${String(dayNumber).padStart(2, '0')} ${String(data.item || '').trim()}`,
+        amount: String(data.amount == null ? '' : data.amount)
+      };
+      cachedData.push(newRecord);
+      localStorage.setItem(dataKey, JSON.stringify(cachedData));
+
+      const previousInfo = localStorage.getItem(syncInfoKey) || '';
+      const cleanPreviousInfo = previousInfo.split('\n')
+        .filter(line => !line.includes('最新新增帳目已加入本機快取'))
+        .join('\n').trim();
+      const cacheNote = '（最新新增帳目已加入本機快取；其他裝置或尚未同步的資料仍需同步）';
+      localStorage.setItem(syncInfoKey, cleanPreviousInfo ? `${cleanPreviousInfo}\n${cacheNote}` : `尚未完整同步雲端資料\n${cacheNote}`);
+
+      if (currentLedger === ledgerName) {
+        localLedgerData = cachedData;
+        updateDatalist();
+        filterLocalData();
+        populateRecordFilterSelectors();
+        if (recordFilterHasRun) renderFilteredRecords(false);
+        const chartTab = document.querySelectorAll('.tab')[2];
+        if (chartTab && chartTab.classList.contains('active')) {
+          populateChartSelectors();
+          renderChart();
+        }
+      }
+      return true;
+    }
+
     async function submitData() {
       const btn = document.getElementById('submitDataBtn');
       if (btn && btn.disabled) return;
+      const ledgerAtSubmission = currentLedger;
       const data = {
         action: 'add',
-        ledger: currentLedger,
+        ledger: ledgerAtSubmission,
         date: document.getElementById('dateInput').value,
         category: document.getElementById('categoryInput').value,
         item: document.getElementById('itemInput').value,
@@ -914,14 +970,23 @@
         const response = await fetch(apiUrl, { method: 'POST', body: JSON.stringify(data) });
         const res = await response.json();
         if (res.status === 'success') {
+          let cacheUpdated = false;
+          try {
+            cacheUpdated = updateLocalCacheAfterAdd(data, ledgerAtSubmission);
+          } catch (cacheErr) {
+            console.error('雲端新增成功，但更新本機快取失敗：', cacheErr);
+          }
           document.getElementById('itemInput').value = '';
           document.getElementById('amountInput').value = '';
           document.getElementById('dateInput').value = getTodayDateString(localStorage.getItem('useTaiwanTime') !== 'false');
           if (statusEl) {
-            statusEl.innerText = '⚠️ 雲端有新資料，建議同步';
-            statusEl.style.color = '#FF9500';
+            statusEl.innerText = cacheUpdated
+              ? '✅ 記帳成功；此筆已加入本機快取。其他裝置的更新仍需同步。'
+              : '⚠️ 雲端記帳成功，但本機快取未能更新；請執行「本月極速同步」。';
+            statusEl.style.color = cacheUpdated ? '#2478D4' : '#FF9500';
           }
-          alert('✅ 記帳成功！');
+          if (cacheUpdated) alert('✅ 記帳成功！新帳目已立即加入本機快取。');
+          else alert('✅ 雲端記帳成功！但本機快取未能更新，請稍後執行「本月極速同步」。');
         } else {
           if (statusEl) {
             statusEl.innerText = '❌ 新增帳目失敗，尚未確認寫入成功';
@@ -1080,15 +1145,15 @@
     function loadLocalData() {
       const stored = localStorage.getItem(getStoreKey('myLedgerData'));
       const info = localStorage.getItem(getStoreKey('myLedgerSyncInfo'));
-      if (stored && info) {
+      if (stored) {
         try { localLedgerData = JSON.parse(stored); if (!Array.isArray(localLedgerData)) localLedgerData = []; }
         catch (err) { localLedgerData = []; }
-        document.getElementById('syncStatus').innerText = info;
+        document.getElementById('syncStatus').innerText = info || '尚未完整同步雲端資料；目前顯示的僅是本機已保存的帳目。';
         updateDatalist();
         filterLocalData();
       } else {
         localLedgerData = [];
-        document.getElementById('syncStatus').innerText = "尚未同步資料";
+        document.getElementById('syncStatus').innerText = info || '尚未同步資料';
         document.getElementById('resultBox').innerHTML = '';
       }
       populateRecordFilterSelectors();
