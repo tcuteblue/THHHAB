@@ -224,6 +224,9 @@
           <input type="text" id="searchInput" placeholder="例：112年 晚餐..." oninput="filterLocalData()" autocomplete="off">
           <button type="button" id="clearSearchBtn" class="search-clear-btn" aria-label="清除搜尋文字" title="清除搜尋文字" onclick="clearSearchInput()">×</button>
         </div>
+        <p id="keywordSearchHelp" style="margin:12px 2px 8px; padding:10px 12px; border-radius:10px; background:#F1F8E9; color:#45633B; font-size:13px; line-height:1.6;">
+          💡 操作說明：<b>單擊明細</b>可編輯或刪除；<b>按住明細約 0.5 秒</b>可進入多選模式。進入多選後，單擊其他明細可勾選／取消勾選；按上方<b>「全選」</b>可選取目前畫面顯示的所有明細，再按一次可取消全選，並可查看合計或刪除選取項目。
+        </p>
         <div class="result-box" id="resultBox"></div>
       </div>
 
@@ -248,7 +251,7 @@
           </div>
         </div>
         <p id="periodRecordHelp" style="margin:12px 2px 8px; padding:10px 12px; border-radius:10px; background:#F1F8E9; color:#45633B; font-size:13px; line-height:1.6;">
-          💡 操作說明：<b>單擊明細</b>可編輯或刪除；<b>按住明細約 0.5 秒</b>可進入多選模式。進入多選後，單擊其他明細可勾選／取消勾選，再使用上方的全選或刪除功能。
+          💡 操作說明：<b>單擊明細</b>可編輯或刪除；<b>按住明細約 0.5 秒</b>可進入多選模式。進入多選後，單擊其他明細可勾選／取消勾選；按上方<b>「全選」</b>可選取目前畫面顯示的所有明細，再按一次可取消全選，並可查看合計或刪除選取項目。
         </p>
         <div class="result-box" id="filteredResultBox"></div>
       </div>
