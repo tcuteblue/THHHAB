@@ -501,7 +501,7 @@
     const syncButtonIds = { this_month: 'syncThisMonthBtn', custom: 'syncCustomBtn', all: 'syncAllBtn' };
     // 完整歷年同步的預設批次大小。建議先保持 1；測試 2 或 3 年時只需修改此值。
     // 批次失敗時會自動逐步拆小，單一年份失敗則改為上下半年。
-    const SYNC_YEARS_PER_REQUEST = 1;
+    const SYNC_YEARS_PER_REQUEST = 10;
     const ALL_MONTHS = ['1月','2月','3月','4月','5月','6月','7月','8月','9月','10月','11月','12月'];
 
     let syncOperationInProgress = false;
