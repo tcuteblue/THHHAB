@@ -59,6 +59,7 @@
     .setting-description { color: #6b7280; font-size: 14px; line-height: 1.5; margin: 6px 0 10px; }
     .settings-action { margin-top: 10px; padding: 12px; font-size: 16px; }
     .sync-status { font-size: 15px; line-height: 1.5; font-weight: 600; margin-top: 14px; padding: 12px; background: #eef5ff; color: #1756a9; border-radius: 8px; text-align: center; white-space: pre-line; overflow-wrap: anywhere; }
+    .sync-status { max-height: 320px; overflow-y: auto; text-align: left; }
 
     label { display: block; margin-top: 15px; font-weight: bold; color: #555; font-size: 18px; }
     input, select { width: 100%; padding: 14px; margin-top: 8px; border-radius: 8px; border: 1px solid #ddd; box-sizing: border-box; font-size: 20px; background: #fafafa; }
@@ -498,6 +499,11 @@
     }
 
     const syncButtonIds = { this_month: 'syncThisMonthBtn', custom: 'syncCustomBtn', all: 'syncAllBtn' };
+    // 完整歷年同步的預設批次大小。建議先保持 1；測試 2 或 3 年時只需修改此值。
+    // 批次失敗時會自動逐步拆小，單一年份失敗則改為上下半年。
+    const SYNC_YEARS_PER_REQUEST = 1;
+    const ALL_MONTHS = ['1月','2月','3月','4月','5月','6月','7月','8月','9月','10月','11月','12月'];
+
     let syncOperationInProgress = false;
     let syncOperationPromise = null;
     function setSyncButtonsBusy(mode, isBusy, forBackup = false) {
@@ -1070,26 +1076,21 @@
       const currentTwYear = new Date().getFullYear() - 1911;
       let queue = [];
       if (mode === 'this_month') {
-        queue.push({ year: currentTwYear.toString(), month: (new Date().getMonth() + 1) + '月' });
+        queue.push({ years: [String(currentTwYear)], month: (new Date().getMonth() + 1) + '月' });
       } else if (mode === 'custom') {
         const y = document.getElementById('syncYearSelect').value;
         const m = document.getElementById('syncMonthSelect').value;
-        if (m === '全部') {
-          queue.push({ year: y, month: ['1月', '2月', '3月', '4月', '5月', '6月'] });
-          queue.push({ year: y, month: ['7月', '8月', '9月', '10月', '11月', '12月'] });
-        } else queue.push({ year: y, month: m });
+        if (m === '全部') queue.push({ years: [String(y)], month: ALL_MONTHS.slice() });
+        else queue.push({ years: [String(y)], month: m });
       } else if (mode === 'all') {
-        if (!confirm('確定完整同步？')) return false;
-        for (let y = currentTwYear; y >= 102; y--) {
-          queue.push({ year: y.toString(), month: ['1月', '2月', '3月', '4月', '5月', '6月'] });
-          queue.push({ year: y.toString(), month: ['7月', '8月', '9月', '10月', '11月', '12月'] });
-        }
+        if (!confirm('確定完整同步？系統會先讀取此帳本實際存在的年度檔案，再逐批同步。')) return false;
+        // 年度清單在同步鎖定後向後端取得，避免家用與工作室共用固定起始年份。
+        queue.push({ discoverYears: true });
       }
       if (!queue.length) return false;
       if (syncOperationInProgress) {
-        // 備份若遇到使用者已啟動的同步，先等該作業結束，再重新嘗試備份前同步，避免拍到同步中的舊快取。
         if (options.forBackup && syncOperationPromise) {
-          try { await syncOperationPromise; } catch (err) { /* 後續仍會重新嘗試備份前同步 */ }
+          try { await syncOperationPromise; } catch (err) { /* 備份前仍重新嘗試同步 */ }
           return await syncData(mode, options);
         }
         if (!options.quietErrors) alert('目前已有同步作業正在進行，請等完成後再操作。');
@@ -1111,11 +1112,14 @@
       return await operationPromise;
     }
 
-    async function executeSyncQueue(queue, mode, options = {}) {
+    async function executeSyncQueue(initialQueue, mode, options = {}) {
       const startTime = performance.now();
       const quietErrors = options.quietErrors === true;
       const silentSuccess = options.silentSuccess === true;
       const statusEl = document.getElementById('syncStatus');
+      const timingRecords = [];
+      let queue = initialQueue.slice();
+      let yearDiscoverySeconds = null;
       const reportSyncError = (message, statusMessage = '❌ 同步失敗') => {
         if (statusEl) {
           statusEl.innerText = statusMessage;
@@ -1123,6 +1127,21 @@
         }
         if (quietErrors) console.warn(message);
         else alert(message);
+      };
+      const setSyncMessage = (message, color = '#FF9500') => {
+        if (statusEl) {
+          statusEl.innerText = message;
+          statusEl.style.color = color;
+        }
+      };
+      const seconds = ms => (Number(ms || 0) / 1000).toFixed(1);
+      const batchName = (years, months) => {
+        const yearText = years.length === 1 ? `${years[0]}年` : `${years[0]}～${years[years.length - 1]}年`;
+        let monthText = '全年';
+        if (typeof months === 'string') monthText = months;
+        else if (Array.isArray(months) && months.length === 6) monthText = months[0] === '1月' ? '上半年' : '下半年';
+        else if (Array.isArray(months) && months.length !== 12) monthText = months.join('、');
+        return `${yearText} ${monthText}`;
       };
 
       let finalData = [];
@@ -1134,64 +1153,168 @@
         return false;
       }
 
-      // 先在暫存陣列中移除要更新的月份；只有整個同步成功後才寫回本機。
+      // 完整同步先向後端查詢此帳本資料夾真正存在的年度檔案。
+      if (mode === 'all') {
+        setSyncMessage('⏳ 正在查詢此帳本實際存在的年度檔案...');
+        try {
+          const lookupStart = performance.now();
+          const lookupResponse = await fetch(apiUrl, {
+            method: 'POST',
+            body: JSON.stringify({ action: 'list_years', ledger: currentLedger })
+          });
+          const lookupText = await lookupResponse.text();
+          let lookupJson;
+          try { lookupJson = JSON.parse(lookupText); }
+          catch (e) { throw new Error('年度清單回應格式異常'); }
+          if (!lookupResponse.ok || lookupJson.status !== 'success' || !Array.isArray(lookupJson.data)) {
+            throw new Error(lookupJson.message || '無法取得帳本年度清單');
+          }
+          yearDiscoverySeconds = seconds(performance.now() - lookupStart);
+          const years = Array.from(new Set(lookupJson.data.map(y => String(y).trim()).filter(y => /^\d+$/.test(y))))
+            .sort((a, b) => Number(b) - Number(a));
+          if (!years.length) throw new Error('此帳本資料夾中找不到符合命名規則的年度試算表');
+          queue = [];
+          for (let i = 0; i < years.length; i += SYNC_YEARS_PER_REQUEST) {
+            queue.push({ years: years.slice(i, i + SYNC_YEARS_PER_REQUEST), month: ALL_MONTHS.slice() });
+          }
+          setSyncMessage(`✅ 找到 ${years.length} 個年度檔案；年度清單查詢 ${yearDiscoverySeconds} 秒。即將同步 ${queue.length} 批...`, '#2478D4');
+        } catch (err) {
+          reportSyncError(`❌ 無法取得帳本年度清單：${err.message}\n請確認已更新並部署新版 GAS 後端。`, '❌ 讀取年度清單失敗');
+          return false;
+        }
+      }
+
+      // 非完整同步時，先在暫存資料中移除本次將更新的年月；只有全部成功才寫回本機。
       if (mode !== 'all') {
         queue.forEach(q => {
+          const year = q.years[0];
           if (Array.isArray(q.month)) {
-            q.month.forEach(m => { finalData = finalData.filter(item => item.month !== (q.year + '年 ' + m)); });
+            q.month.forEach(m => { finalData = finalData.filter(item => item.month !== `${year}年 ${m}`); });
           } else {
-            finalData = finalData.filter(item => item.month !== (q.year + '年 ' + q.month));
+            finalData = finalData.filter(item => item.month !== `${year}年 ${q.month}`);
           }
         });
       }
 
-      for (let i = 0; i < queue.length; i++) {
-        const q = queue[i];
-        const monthLabel = Array.isArray(q.month) ? (q.month[0] === '1月' ? '上半年' : '下半年') : q.month;
-        if (statusEl) {
-          statusEl.innerText = `${options.forBackup ? '⏳ 備份前更新' : '⏳ 正在抓取'} ${q.year}年 ${monthLabel} (${i + 1}/${queue.length})...`;
-          statusEl.style.color = '#FF9500';
+      // 單次 GAS 請求可包含一個或多個年度；失敗時先拆分年度，再將單一年份改為上下半年。
+      async function requestBatch(years, months) {
+        const requestStart = performance.now();
+        let json;
+        try {
+          const response = await fetch(apiUrl, {
+            method: 'POST',
+            body: JSON.stringify({
+              action: 'sync_custom',
+              targetYear: years.length === 1 ? years[0] : undefined,
+              targetYears: years,
+              targetMonth: months,
+              ledger: currentLedger
+            })
+          });
+          const responseText = await response.text();
+          try { json = JSON.parse(responseText); }
+          catch (parseError) {
+            const parseErr = new Error('雲端回應格式異常（可能執行逾時或連線中斷）');
+            parseErr.isResponseFormatError = true;
+            throw parseErr;
+          }
+          if (!response.ok || json.status !== 'success') {
+            const serverErr = new Error(json.message || `雲端回應失敗（HTTP ${response.status}）`);
+            serverErr.isBackendError = true;
+            serverErr.serverMs = Number(json.elapsedMs || 0);
+            throw serverErr;
+          }
+          if (!Array.isArray(json.data)) throw new Error('雲端回傳的帳目資料格式不正確');
+          return {
+            data: json.data,
+            clientMs: performance.now() - requestStart,
+            serverMs: Number(json.elapsedMs || 0)
+          };
+        } catch (err) {
+          if (err.clientMs === undefined) err.clientMs = performance.now() - requestStart;
+          if (err.serverMs === undefined && json) err.serverMs = Number(json.elapsedMs || 0);
+          throw err;
         }
+      }
 
-        let success = false;
-        for (let retry = 0; retry < 2 && !success; retry++) {
-          try {
-            const response = await fetch(apiUrl, {
-              method: 'POST',
-              body: JSON.stringify({ action: 'sync_custom', targetYear: q.year, targetMonth: q.month, ledger: currentLedger })
-            });
-            const responseText = await response.text();
-            let json;
-            try { json = JSON.parse(responseText); }
-            catch (parseError) { throw new Error('雲端回應格式異常'); }
-
-            if (json.status !== 'success') {
-              reportSyncError('❌ 雲端拒絕請求：\n' + (json.message || '未知錯誤'), '❌ 雲端拒絕同步');
-              return false;
-            }
-            if (!Array.isArray(json.data)) throw new Error('雲端回傳的帳目資料格式不正確');
-            if (json.data.length > 0) finalData = finalData.concat(json.data);
-            success = true;
-          } catch (err) {
-            if (retry === 0) {
-              if (statusEl) statusEl.innerText = '⚠️ 網路或回應異常，自動重試中...';
-              await new Promise(resolve => setTimeout(resolve, 1500));
-            } else {
-              const message = '❌ 雲端同步連線失敗或回應異常。\n同步已中止，原本本機資料未被覆蓋。';
-              reportSyncError(message, '❌ 同步中斷（本機資料已保留）');
-              return false;
+      async function processBatch(years, months, progressText, canRetryQuickError = true) {
+        const label = batchName(years, months);
+        setSyncMessage(`${options.forBackup ? '⏳ 備份前更新' : '⏳ 正在抓取'} ${label}（${progressText}）...`);
+        let result;
+        try {
+          result = await requestBatch(years, months);
+        } catch (firstErr) {
+          // 快速的暫時性連線錯誤可重試一次；耗時很久或 GAS 明確回傳錯誤時直接縮小批次，避免再等一整輪。
+          const isQuickTransportError = !firstErr.isBackendError && Number(firstErr.clientMs || 0) < 30000;
+          if (canRetryQuickError && isQuickTransportError) {
+            setSyncMessage(`⚠️ ${label} 連線異常，短暫重試一次...`);
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            try {
+              result = await requestBatch(years, months);
+            } catch (retryErr) {
+              firstErr = retryErr;
+              result = null;
             }
           }
+          if (!result) {
+            timingRecords.push({ label, ok: false, clientMs: Number(firstErr.clientMs || 0), serverMs: Number(firstErr.serverMs || 0), records: 0, note: firstErr.message || '請求失敗' });
+            if (years.length > 1) {
+              const splitAt = Math.ceil(years.length / 2);
+              const leftYears = years.slice(0, splitAt);
+              const rightYears = years.slice(splitAt);
+              setSyncMessage(`⚠️ ${label} 失敗，縮小為 ${leftYears.length} 年／${rightYears.length} 年批次重試...`);
+              await processBatch(leftYears, months, progressText + '．拆分', true);
+              await processBatch(rightYears, months, progressText + '．拆分', true);
+              return;
+            }
+            if (years.length === 1 && Array.isArray(months) && months.length > 6) {
+              const leftMonths = months.slice(0, Math.ceil(months.length / 2));
+              const rightMonths = months.slice(Math.ceil(months.length / 2));
+              setSyncMessage(`⚠️ ${years[0]} 年全年請求失敗，改為上半年與下半年分開同步...`);
+              await processBatch(years, leftMonths, `${progressText}．上半年`, true);
+              await processBatch(years, rightMonths, `${progressText}．下半年`, true);
+              return;
+            }
+            throw new Error(`${label}同步失敗：${firstErr.message || '連線錯誤'}`);
+          }
         }
-        await new Promise(resolve => setTimeout(resolve, 300));
+
+        finalData = finalData.concat(result.data);
+        timingRecords.push({ label, ok: true, clientMs: result.clientMs, serverMs: result.serverMs, records: result.data.length, note: '' });
+        setSyncMessage(`✅ ${label}完成：${result.data.length} 筆；網路往返 ${seconds(result.clientMs)} 秒，GAS 執行 ${result.serverMs ? seconds(result.serverMs) : '未提供'} 秒。`, '#2478D4');
+      }
+
+      try {
+        for (let i = 0; i < queue.length; i++) {
+          await processBatch(queue[i].years, queue[i].month, `${i + 1}/${queue.length}`);
+        }
+      } catch (err) {
+        const failedTimingSummary = timingRecords.map(r => {
+          const runtime = `${r.label}：往返 ${seconds(r.clientMs)} 秒／GAS ${r.serverMs ? seconds(r.serverMs) : '未知'} 秒`;
+          return r.ok ? `${runtime}／${r.records} 筆` : `${runtime}／失敗：${r.note}`;
+        });
+        const diagnosticText = failedTimingSummary.length
+          ? `\n\n本次批次耗時（供診斷）：\n${failedTimingSummary.join('\n')}`
+          : '';
+        console.table(timingRecords);
+        reportSyncError(`❌ ${err.message}\n同步已中止，原本本機資料未被覆蓋。${diagnosticText}`, '❌ 同步中斷（本機資料已保留）');
+        return false;
       }
 
       const duration = ((performance.now() - startTime) / 1000).toFixed(1);
+      const timingSummary = timingRecords.map(r => {
+        const runtime = `${r.label}：往返 ${seconds(r.clientMs)} 秒／GAS ${r.serverMs ? seconds(r.serverMs) : '未知'} 秒`;
+        return r.ok ? `${runtime}／${r.records} 筆` : `${runtime}／失敗：${r.note}`;
+      });
+      const syncInfo = `上次同步：${new Date().toLocaleString()}\n(共 ${finalData.length} 筆，總耗時 ${duration} 秒)` +
+        (yearDiscoverySeconds ? `\n年度清單查詢：${yearDiscoverySeconds} 秒` : '') +
+        `\n各批耗時（網路往返／GAS 執行）：\n${timingSummary.join('\n')}`;
       localStorage.setItem(getStoreKey('myLedgerData'), JSON.stringify(finalData));
-      localStorage.setItem(getStoreKey('myLedgerSyncInfo'), `上次同步：${new Date().toLocaleString()}\n(共 ${finalData.length} 筆，耗時 ${duration} 秒)`);
+      localStorage.setItem(getStoreKey('myLedgerSyncInfo'), syncInfo);
       if (statusEl) statusEl.style.color = '#2478D4';
       loadLocalData();
-      if (!silentSuccess) alert(`✅ 同步完成！更新 ${finalData.length} 筆`);
+      if (!silentSuccess) alert(`✅ 同步完成！更新 ${finalData.length} 筆，總耗時 ${duration} 秒。\n各批耗時與 GAS 執行時間已記錄在「同步狀態與最後同步時間」。`);
+      console.table(timingRecords);
       return true;
     }
 
