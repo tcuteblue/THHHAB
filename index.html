@@ -317,7 +317,9 @@
           </select>
         </div>
         <button id="syncCustomBtn" class="sync-btn" style="background: #34A853;" onclick="syncData('custom')">指定月份同步</button>
-        <button id="syncAllBtn" class="sync-btn" style="background: #FF9500;" onclick="syncData('all')">完整歷年同步</button>
+        <button id="syncAllBtn" class="sync-btn" style="background: #FF9500;" onclick="syncData('all')">完整歷年同步（10年一批）</button>
+        <button id="resumeFullSyncBtn" class="sync-btn" style="display:none; background:#0F766E;" onclick="resumeFullSync()">🔁 恢復中斷的完整同步</button>
+        <div id="resumeSyncNotice" style="display:none; margin-top:8px; padding:10px; border-radius:8px; background:#E6FFFB; color:#115E59; font-size:14px; line-height:1.5;"></div>
         <div style="margin-top: 16px; font-size: 14px; font-weight: bold; color: #555;">同步狀態與最後同步時間</div>
         <div class="sync-status" id="syncStatus" role="status" aria-live="polite">尚未同步資料</div>
       </div>
@@ -499,14 +501,20 @@
     }
 
     const syncButtonIds = { this_month: 'syncThisMonthBtn', custom: 'syncCustomBtn', all: 'syncAllBtn' };
-    // 完整歷年同步的預設批次大小。建議先保持 1；測試 2 或 3 年時只需修改此值。
-    // 批次失敗時會自動逐步拆小，單一年份失敗則改為上下半年。
+    // 完整歷年同步固定採 10 年一批；同一批最多嘗試 3 次，仍失敗時詢問是否改為 1 年一批。
+    // 本月／指定月份同步仍沿用原有處理方式。
     const SYNC_YEARS_PER_REQUEST = 10;
+    const FULL_SYNC_MAX_ATTEMPTS = 3;
+    const FULL_SYNC_DB_NAME = 'HomeLedgerFullSyncCheckpointDB';
+    const FULL_SYNC_DB_VERSION = 1;
+    const FULL_SYNC_STORE_NAME = 'progress';
     const ALL_MONTHS = ['1月','2月','3月','4月','5月','6月','7月','8月','9月','10月','11月','12月'];
 
     let syncOperationInProgress = false;
     let syncOperationPromise = null;
     function setSyncButtonsBusy(mode, isBusy, forBackup = false) {
+      const resumeButton = document.getElementById('resumeFullSyncBtn');
+      if (resumeButton) resumeButton.disabled = isBusy;
       Object.entries(syncButtonIds).forEach(([buttonMode, id]) => {
         const button = document.getElementById(id);
         if (!button) return;
@@ -565,10 +573,15 @@
     function getStoreKey(keyName) { return getStoreKeyForLedger(currentLedger, keyName); }
 
     function toggleLedger() {
+      if (syncOperationInProgress) {
+        alert('同步作業進行中，請等候完成或中止後再切換帳本。');
+        return;
+      }
       currentLedger = currentLedger === 'home' ? 'studio' : 'home';
       document.getElementById('appHeader').style.backgroundColor = currentLedger === 'studio' ? '#5E5CE6' : '#34A853';
       document.getElementById('headerTitle').innerText = currentLedger === 'studio' ? '工作室帳本' : '家用雲帳本';
       loadCategories(); loadQuickTags(); loadLocalData();
+      updateResumeSyncUI();
       if (document.querySelectorAll('.tab')[2].classList.contains('active')) { populateChartSelectors(); renderChart(); }
     }
 
@@ -799,7 +812,8 @@
       for (let y = currentTwYear + 1; y >= 102; y--) { yearSelect.appendChild(new Option(y, y, false, y === currentTwYear)); }
       document.getElementById('syncMonthSelect').value = (new Date().getMonth() + 1) + "月";
       
-      loadCategories(); loadQuickTags(); loadLocalData(); 
+      loadCategories(); loadQuickTags(); loadLocalData();
+      updateResumeSyncUI();
     };
 
     function switchTab(tabName) {
@@ -1072,6 +1086,121 @@
       }
     }
 
+    // ======== 🧷 完整同步進度保存（IndexedDB） ========
+    // 同步資料可能有上萬筆，不把暫存結果重複存進 localStorage，以免超過容量限制。
+    function openFullSyncProgressDB() {
+      return new Promise((resolve, reject) => {
+        if (!('indexedDB' in window)) {
+          reject(new Error('此瀏覽器不支援 IndexedDB，無法安全保存同步進度。'));
+          return;
+        }
+        const request = indexedDB.open(FULL_SYNC_DB_NAME, FULL_SYNC_DB_VERSION);
+        request.onupgradeneeded = () => {
+          const db = request.result;
+          if (!db.objectStoreNames.contains(FULL_SYNC_STORE_NAME)) {
+            db.createObjectStore(FULL_SYNC_STORE_NAME, { keyPath: 'id' });
+          }
+        };
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error || new Error('無法開啟同步進度資料庫'));
+        request.onblocked = () => reject(new Error('同步進度資料庫正在升級，請重新整理頁面後再試。'));
+      });
+    }
+
+    function fullSyncProgressId(ledgerName) { return `${ledgerName}:full-history-sync`; }
+
+    async function readFullSyncProgress(ledgerName = currentLedger) {
+      const db = await openFullSyncProgressDB();
+      try {
+        return await new Promise((resolve, reject) => {
+          const tx = db.transaction(FULL_SYNC_STORE_NAME, 'readonly');
+          const request = tx.objectStore(FULL_SYNC_STORE_NAME).get(fullSyncProgressId(ledgerName));
+          request.onsuccess = () => resolve(request.result || null);
+          request.onerror = () => reject(request.error || new Error('讀取同步進度失敗'));
+          tx.onabort = () => reject(tx.error || new Error('讀取同步進度交易中止'));
+        });
+      } finally { db.close(); }
+    }
+
+    async function saveFullSyncProgress(progress) {
+      const db = await openFullSyncProgressDB();
+      try {
+        await new Promise((resolve, reject) => {
+          const tx = db.transaction(FULL_SYNC_STORE_NAME, 'readwrite');
+          tx.objectStore(FULL_SYNC_STORE_NAME).put(progress);
+          tx.oncomplete = () => resolve();
+          tx.onerror = () => reject(tx.error || new Error('保存同步進度失敗'));
+          tx.onabort = () => reject(tx.error || new Error('保存同步進度交易中止'));
+        });
+      } finally { db.close(); }
+    }
+
+    async function deleteFullSyncProgress(ledgerName = currentLedger) {
+      const db = await openFullSyncProgressDB();
+      try {
+        await new Promise((resolve, reject) => {
+          const tx = db.transaction(FULL_SYNC_STORE_NAME, 'readwrite');
+          tx.objectStore(FULL_SYNC_STORE_NAME).delete(fullSyncProgressId(ledgerName));
+          tx.oncomplete = () => resolve();
+          tx.onerror = () => reject(tx.error || new Error('清除同步進度失敗'));
+          tx.onabort = () => reject(tx.error || new Error('清除同步進度交易中止'));
+        });
+      } finally { db.close(); }
+    }
+
+    async function updateResumeSyncUI() {
+      const button = document.getElementById('resumeFullSyncBtn');
+      const notice = document.getElementById('resumeSyncNotice');
+      if (!button || !notice) return;
+      if (syncOperationInProgress) {
+        button.style.display = 'none';
+        notice.style.display = 'none';
+        return;
+      }
+      try {
+        const progress = await readFullSyncProgress(currentLedger);
+        const hasPending = !!(progress && progress.mode === 'all' && Array.isArray(progress.queue));
+        if (!hasPending) {
+          button.style.display = 'none';
+          notice.style.display = 'none';
+          return;
+        }
+        const total = progress.queue.length;
+        const completed = Math.min(Number(progress.nextBatchIndex || 0), total);
+        const ledgerText = currentLedger === 'home' ? '家用帳本' : '工作室帳本';
+        button.style.display = 'block';
+        button.textContent = completed >= total ? '✅ 完成上次同步資料的寫入' : '🔁 恢復中斷的完整同步';
+        notice.style.display = 'block';
+        notice.textContent = `${ledgerText}有未完成的同步進度：已完成 ${completed}/${total} 批。已成功取得的批次已保存；恢復時會保留這些結果，繼續處理未完成的部分。若雲端在中斷期間又有變更，完成後建議再執行一次完整同步。`;
+      } catch (err) {
+        button.style.display = 'none';
+        notice.style.display = 'none';
+        console.warn('無法檢查待恢復的同步進度：', err);
+      }
+    }
+
+    async function resumeFullSync() {
+      if (syncOperationInProgress) {
+        alert('目前已有同步作業正在進行。');
+        return false;
+      }
+      try {
+        const progress = await readFullSyncProgress(currentLedger);
+        if (!progress || progress.mode !== 'all') {
+          await updateResumeSyncUI();
+          alert('目前沒有可恢復的完整同步進度。');
+          return false;
+        }
+        const completed = Math.min(Number(progress.nextBatchIndex || 0), progress.queue.length);
+        const ok = confirm(`要恢復上次中斷的完整同步嗎？\n目前已完成 ${completed}/${progress.queue.length} 批。\n已完成批次會沿用保存的結果，只接續尚未完成的批次。`);
+        if (!ok) return false;
+        return await syncData('all', { resumeCheckpoint: progress, skipAllConfirm: true });
+      } catch (err) {
+        alert(`讀取同步進度失敗：${err.message || err}\n請重新整理頁面後再試。`);
+        return false;
+      }
+    }
+
     async function syncData(mode, options = {}) {
       const currentTwYear = new Date().getFullYear() - 1911;
       let queue = [];
@@ -1083,8 +1212,30 @@
         if (m === '全部') queue.push({ years: [String(y)], month: ALL_MONTHS.slice() });
         else queue.push({ years: [String(y)], month: m });
       } else if (mode === 'all') {
-        if (!confirm('確定完整同步？系統會先讀取此帳本實際存在的年度檔案，再逐批同步。')) return false;
-        // 年度清單在同步鎖定後向後端取得，避免家用與工作室共用固定起始年份。
+        // 若有中斷進度，優先詢問是否接續；重新開始前會再次確認，避免誤刪暫存成果。
+        if (!options.resumeCheckpoint && !options.skipResumePrompt && !options.forBackup) {
+          let pending = null;
+          try { pending = await readFullSyncProgress(currentLedger); }
+          catch (progressErr) { console.warn('讀取待恢復進度失敗：', progressErr); }
+          if (pending && pending.mode === 'all') {
+            const done = Math.min(Number(pending.nextBatchIndex || 0), (pending.queue || []).length);
+            if (confirm(`找到上次未完成的完整同步進度（已完成 ${done}/${(pending.queue || []).length} 批）。
+按「確定」接續進度；按「取消」可選擇重新開始。`)) {
+              options = { ...options, resumeCheckpoint: pending, skipAllConfirm: true };
+            } else if (confirm('要放棄上次暫存進度，重新從頭同步全部年度嗎？')) {
+              try { await deleteFullSyncProgress(currentLedger); }
+              catch (deleteErr) { alert(`無法清除舊進度，為避免覆蓋請先重新整理再試。
+${deleteErr.message || deleteErr}`); return false; }
+              options = { ...options, skipAllConfirm: true };
+            } else {
+              return false;
+            }
+          }
+        }
+        if (!options.resumeCheckpoint && !options.skipAllConfirm && !options.forBackup) {
+          if (!confirm('確定完整同步？系統會查詢此帳本實際存在的年度檔案，預設每 10 年一批；單批連續失敗 3 次時會詢問是否改用 1 年一批。')) return false;
+        }
+        // 真正年度清單與批次排程交由可恢復的完整同步流程處理。
         queue.push({ discoverYears: true });
       }
       if (!queue.length) return false;
@@ -1106,13 +1257,274 @@
           syncOperationInProgress = false;
           setSyncButtonsBusy(mode, false, options.forBackup === true);
           if (syncOperationPromise === operationPromise) syncOperationPromise = null;
+          updateResumeSyncUI();
         }
       })();
       syncOperationPromise = operationPromise;
       return await operationPromise;
     }
 
+    async function executeFullSyncWithCheckpoint(options = {}) {
+      const runStart = performance.now();
+      const statusEl = document.getElementById('syncStatus');
+      const seconds = ms => (Number(ms || 0) / 1000).toFixed(1);
+      const batchName = (years, months) => {
+        const yearText = years.length === 1 ? `${years[0]}年` : `${years[0]}～${years[years.length - 1]}年`;
+        let monthText = '全年';
+        if (typeof months === 'string') monthText = months;
+        else if (Array.isArray(months) && months.length === 6) monthText = months[0] === '1月' ? '上半年' : '下半年';
+        else if (Array.isArray(months) && months.length !== 12) monthText = months.join('、');
+        return `${yearText} ${monthText}`;
+      };
+      const setMessage = (message, color = '#FF9500') => {
+        if (statusEl) { statusEl.innerText = message; statusEl.style.color = color; }
+      };
+      const reportError = (message, title = '❌ 同步中斷') => {
+        setMessage(title, '#FF3B30');
+        alert(message);
+      };
+      const ledgerAtStart = currentLedger;
+      let progress = options.resumeCheckpoint && typeof options.resumeCheckpoint === 'object'
+        ? options.resumeCheckpoint : null;
+
+      try {
+        if (progress && progress.ledger !== ledgerAtStart) {
+          throw new Error('待恢復進度屬於另一個帳本，請切換到正確帳本後再恢復。');
+        }
+
+        if (!progress) {
+          setMessage('⏳ 正在查詢此帳本實際存在的年度檔案...');
+          const lookupStart = performance.now();
+          const lookupResponse = await fetch(apiUrl, {
+            method: 'POST',
+            body: JSON.stringify({ action: 'list_years', ledger: ledgerAtStart })
+          });
+          const lookupText = await lookupResponse.text();
+          let lookupJson;
+          try { lookupJson = JSON.parse(lookupText); }
+          catch (e) { throw new Error('年度清單回應格式異常'); }
+          if (!lookupResponse.ok || lookupJson.status !== 'success' || !Array.isArray(lookupJson.data)) {
+            throw new Error(lookupJson.message || '無法取得帳本年度清單');
+          }
+          const yearDiscoverySeconds = seconds(performance.now() - lookupStart);
+          const years = Array.from(new Set(lookupJson.data.map(y => String(y).trim()).filter(y => /^\d+$/.test(y))))
+            .sort((a, b) => Number(b) - Number(a));
+          if (!years.length) throw new Error('此帳本資料夾中找不到符合命名規則的年度試算表');
+          const queue = [];
+          for (let i = 0; i < years.length; i += SYNC_YEARS_PER_REQUEST) {
+            queue.push({ years: years.slice(i, i + SYNC_YEARS_PER_REQUEST), month: ALL_MONTHS.slice() });
+          }
+          progress = {
+            id: fullSyncProgressId(ledgerAtStart),
+            ledger: ledgerAtStart,
+            mode: 'all',
+            years,
+            queue,
+            nextBatchIndex: 0,
+            data: [],
+            timingRecords: [],
+            currentBatchAttempts: 0,
+            fallbackMode: false,
+            batchSize: SYNC_YEARS_PER_REQUEST,
+            yearDiscoverySeconds,
+            elapsedMs: performance.now() - runStart,
+            startedAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+          };
+          // 先建立 checkpoint，避免頁面在第一個請求中斷時毫無恢復紀錄。
+          await saveFullSyncProgress(progress);
+          setMessage(`✅ 找到 ${years.length} 個年度檔案，排成 ${queue.length} 批（每批最多 ${SYNC_YEARS_PER_REQUEST} 年）。進度已保存。`, '#2478D4');
+        } else {
+          // 正規化舊版本／中斷時的欄位，確保恢復時有陣列可用。
+          if (!Array.isArray(progress.data)) progress.data = [];
+          if (!Array.isArray(progress.timingRecords)) progress.timingRecords = [];
+          if (!Array.isArray(progress.queue) || !Array.isArray(progress.years)) {
+            throw new Error('保存的同步進度格式不完整，無法安全恢復；請重新開始完整同步。');
+          }
+          if (progress.id !== fullSyncProgressId(ledgerAtStart)) {
+            progress.id = fullSyncProgressId(ledgerAtStart);
+          }
+          await saveFullSyncProgress(progress);
+          setMessage(`🔁 正在恢復同步：已完成 ${progress.nextBatchIndex}/${progress.queue.length} 批，接續處理未完成批次...`, '#2478D4');
+        }
+
+        async function switchRemainingToSingleYearBatches() {
+          const completedQueue = progress.queue.slice(0, progress.nextBatchIndex);
+          const remainingYears = progress.queue.slice(progress.nextBatchIndex)
+            .flatMap(batch => (batch.years || []).map(year => String(year)));
+          progress.queue = completedQueue.concat(remainingYears.map(year => ({ years: [year], month: ALL_MONTHS.slice() })));
+          progress.batchSize = 1;
+          progress.fallbackMode = true;
+          progress.currentBatchAttempts = 0;
+          progress.updatedAt = new Date().toISOString();
+          await saveFullSyncProgress(progress);
+          setMessage(`已切換為一年一批，保留先前成功的 ${progress.nextBatchIndex} 批；接下來處理 ${remainingYears.length} 個年度...`, '#FF9500');
+        }
+
+        async function askForYearFallback(batchLabel) {
+          const useSingleYear = confirm(`⚠️ ${batchLabel} 已連續 ${FULL_SYNC_MAX_ATTEMPTS} 次同步失敗。\n\n是否改用「一年一批」同步？\n\n選擇「確定」：保留已成功的批次，只把目前失敗批次及後續未完成年度改成一年一批。\n選擇「取消」：保留目前進度，稍後可再按「恢復中斷的完整同步」。`);
+          if (!useSingleYear) {
+            setMessage(`⚠️ ${batchLabel} 已失敗 ${FULL_SYNC_MAX_ATTEMPTS} 次；進度已保存，可稍後恢復或重試。`, '#FF9500');
+            await updateResumeSyncUI();
+            return false;
+          }
+          await switchRemainingToSingleYearBatches();
+          return true;
+        }
+
+        async function requestOneBatch(batch) {
+          const requestStart = performance.now();
+          let json;
+          const years = batch.years.map(String);
+          const months = batch.month;
+          try {
+            const response = await fetch(apiUrl, {
+              method: 'POST',
+              body: JSON.stringify({
+                action: 'sync_custom',
+                targetYear: years.length === 1 ? years[0] : undefined,
+                targetYears: years,
+                targetMonth: months,
+                ledger: ledgerAtStart
+              })
+            });
+            const responseText = await response.text();
+            try { json = JSON.parse(responseText); }
+            catch (parseError) {
+              const err = new Error('雲端回應格式異常（可能執行逾時或連線中斷）');
+              err.isResponseFormatError = true;
+              throw err;
+            }
+            if (!response.ok || json.status !== 'success') {
+              const err = new Error(json.message || `雲端回應失敗（HTTP ${response.status}）`);
+              err.isBackendError = true;
+              err.serverMs = Number(json.elapsedMs || 0);
+              throw err;
+            }
+            if (!Array.isArray(json.data)) throw new Error('雲端回傳的帳目資料格式不正確');
+            return { data: json.data, clientMs: performance.now() - requestStart, serverMs: Number(json.elapsedMs || 0) };
+          } catch (err) {
+            if (err.clientMs === undefined) err.clientMs = performance.now() - requestStart;
+            if (err.serverMs === undefined && json) err.serverMs = Number(json.elapsedMs || 0);
+            throw err;
+          }
+        }
+
+        while (progress.nextBatchIndex < progress.queue.length) {
+          const batch = progress.queue[progress.nextBatchIndex];
+          const label = batchName(batch.years, batch.month);
+
+          // 若上次中斷前已用完三次大型批次嘗試，先詢問是否降級；一年一批也失敗時，下次由使用者明確選擇重試。
+          if (Number(progress.currentBatchAttempts || 0) >= FULL_SYNC_MAX_ATTEMPTS) {
+            if (!progress.fallbackMode) {
+              const didFallback = await askForYearFallback(label);
+              if (!didFallback) return false;
+              continue;
+            }
+            if (!confirm(`⚠️ ${label} 一年一批仍已失敗 ${FULL_SYNC_MAX_ATTEMPTS} 次。\n是否再重試這個年度（最多再嘗試 ${FULL_SYNC_MAX_ATTEMPTS} 次）？`)) {
+              setMessage(`⚠️ ${label} 仍失敗，進度已保存；可稍後再恢復。`, '#FF9500');
+              await updateResumeSyncUI();
+              return false;
+            }
+            progress.currentBatchAttempts = 0;
+            await saveFullSyncProgress(progress);
+          }
+
+          let result = null;
+          let finalError = null;
+          while (progress.currentBatchAttempts < FULL_SYNC_MAX_ATTEMPTS) {
+            progress.currentBatchAttempts = Number(progress.currentBatchAttempts || 0) + 1;
+            progress.updatedAt = new Date().toISOString();
+            // 先記錄正在使用的嘗試次數；若手機直接殺掉頁面，恢復時不會無限制地重播請求。
+            await saveFullSyncProgress(progress);
+            setMessage(`⏳ 正在同步 ${label}（第 ${progress.currentBatchAttempts}/${FULL_SYNC_MAX_ATTEMPTS} 次；已完成 ${progress.nextBatchIndex}/${progress.queue.length} 批）...`);
+            try {
+              result = await requestOneBatch(batch);
+              progress.elapsedMs = Number(progress.elapsedMs || 0) + result.clientMs;
+              break;
+            } catch (err) {
+              finalError = err;
+              const elapsed = Number(err.clientMs || 0);
+              progress.elapsedMs = Number(progress.elapsedMs || 0) + elapsed;
+              progress.timingRecords.push({
+                label: `${label}（第 ${progress.currentBatchAttempts} 次失敗）`,
+                ok: false,
+                clientMs: elapsed,
+                serverMs: Number(err.serverMs || 0),
+                records: 0,
+                note: err.message || '請求失敗'
+              });
+              progress.updatedAt = new Date().toISOString();
+              await saveFullSyncProgress(progress);
+              if (progress.currentBatchAttempts < FULL_SYNC_MAX_ATTEMPTS) {
+                setMessage(`⚠️ ${label} 第 ${progress.currentBatchAttempts} 次失敗：${err.message || '連線錯誤'}；準備重試...`);
+                await new Promise(resolve => setTimeout(resolve, 1200));
+              }
+            }
+          }
+
+          if (!result) {
+            console.table(progress.timingRecords);
+            if (!progress.fallbackMode) {
+              const didFallback = await askForYearFallback(label);
+              if (!didFallback) return false;
+              continue;
+            }
+            reportError(`❌ ${label} 一年一批仍連續失敗 ${FULL_SYNC_MAX_ATTEMPTS} 次。\n\n已保存目前進度，原本本機帳目沒有被覆蓋。請檢查網路或稍後恢復同步。\n最後錯誤：${finalError ? (finalError.message || finalError) : '未知錯誤'}`, '❌ 一年一批同步仍失敗（進度已保存）');
+            await updateResumeSyncUI();
+            return false;
+          }
+
+          progress.data = progress.data.concat(result.data);
+          progress.timingRecords.push({ label, ok: true, clientMs: result.clientMs, serverMs: result.serverMs, records: result.data.length, note: '' });
+          progress.nextBatchIndex += 1;
+          progress.currentBatchAttempts = 0;
+          progress.updatedAt = new Date().toISOString();
+          // 每個批次成功後立刻落盤，下一批若中斷，就只需恢復未完成部分。
+          await saveFullSyncProgress(progress);
+          setMessage(`✅ ${label}完成：${result.data.length} 筆；網路往返 ${seconds(result.clientMs)} 秒，GAS 執行 ${result.serverMs ? seconds(result.serverMs) : '未提供'} 秒。進度已保存。`, '#2478D4');
+        }
+
+        const duration = seconds(Number(progress.elapsedMs || (performance.now() - runStart)));
+        const timingSummary = progress.timingRecords.map(r => {
+          const runtime = `${r.label}：往返 ${seconds(r.clientMs)} 秒／GAS ${r.serverMs ? seconds(r.serverMs) : '未知'} 秒`;
+          return r.ok ? `${runtime}／${r.records} 筆` : `${runtime}／失敗：${r.note}`;
+        });
+        const syncInfo = `上次同步：${new Date().toLocaleString()}\n(共 ${progress.data.length} 筆，總耗時 ${duration} 秒)` +
+          (progress.yearDiscoverySeconds ? `\n年度清單查詢：${progress.yearDiscoverySeconds} 秒` : '') +
+          `\n各批耗時（網路往返／GAS 執行）：\n${timingSummary.join('\n')}` +
+          (progress.fallbackMode ? '\n（本次曾切換為一年一批完成同步）' : '\n（完整同步採 10 年一批）');
+
+        try {
+          // 所有批次完整取得後才提交本機快取；若本機儲存失敗，checkpoint 保留供重新提交，不必重抓雲端。
+          localStorage.setItem(getStoreKeyForLedger(ledgerAtStart, 'myLedgerData'), JSON.stringify(progress.data));
+          localStorage.setItem(getStoreKeyForLedger(ledgerAtStart, 'myLedgerSyncInfo'), syncInfo);
+        } catch (storageError) {
+          reportError(`資料已從雲端完整取得，但寫入本機儲存失敗：${storageError.message || storageError}\n\n同步進度仍已保留。請確認瀏覽器儲存空間後，再按「恢復中斷的完整同步」完成提交。`, '⚠️ 雲端資料已取得，但尚未完成本機寫入');
+          await updateResumeSyncUI();
+          return false;
+        }
+
+        await deleteFullSyncProgress(ledgerAtStart);
+        if (currentLedger === ledgerAtStart) loadLocalData();
+        await updateResumeSyncUI();
+        if (statusEl) statusEl.style.color = '#2478D4';
+        alert(`✅ 完整同步完成！共 ${progress.data.length} 筆，耗時約 ${duration} 秒。\n\n預設採 10 年一批；每批最多嘗試 ${FULL_SYNC_MAX_ATTEMPTS} 次，必要時可改用一年一批。\n各批耗時及失敗重試紀錄已保存至同步狀態。`);
+        console.table(progress.timingRecords);
+        return true;
+      } catch (err) {
+        console.error('完整同步中斷：', err);
+        if (progress) {
+          try { await saveFullSyncProgress(progress); } catch (saveErr) { console.error('保存同步進度失敗：', saveErr); }
+        }
+        reportError(`❌ 完整同步中斷：${err.message || err}\n\n已盡可能保存已完成批次。原本本機帳目不會因部分批次完成而被整批覆蓋。`, '❌ 完整同步中斷（已保留原本帳目）');
+        await updateResumeSyncUI();
+        return false;
+      }
+    }
+
     async function executeSyncQueue(initialQueue, mode, options = {}) {
+      if (mode === 'all') return await executeFullSyncWithCheckpoint(options);
       const startTime = performance.now();
       const quietErrors = options.quietErrors === true;
       const silentSuccess = options.silentSuccess === true;
