@@ -913,7 +913,8 @@
         const categoryHtml = item.category ? `<span class="result-category">${escapeHtml(item.category)}</span>` : '';
         const detail = escapeHtml(item.detail || '（沒有項目說明）');
         const monthText = escapeHtml(item.month || '');
-        const amountText = escapeHtml(item.amount == null ? '0' : item.amount);
+        const amountRaw = String(item.amount == null ? '' : item.amount).trim();
+        const amountText = amountRaw ? `$ ${escapeHtml(amountRaw)}` : '（未填金額）';
         const key = getRecordSelectionKey(item);
         const keyAttr = escapeHtml(key);
         const safeItem = encodeURIComponent(JSON.stringify(item)).replace(/'/g, '%27');
@@ -922,7 +923,7 @@
         const selected = selectedItemsMap.has(key);
         return `<div id="period-res-${index}" class="result-item" data-select-key="${keyAttr}" data-select-amount="${amt}" data-item="${safeItemAttr}" onclick="itemClickFromElement(event, this)" oncontextmenu="return false;" ontouchstart="startPress(event, this)" ontouchend="endPress(event)" onmousedown="startPress(event, this)" onmouseup="endPress(event)" onmouseleave="endPress(event)" style="display:flex; justify-content:space-between; align-items:flex-start; gap:10px; cursor:pointer; user-select:none; ${selected ? 'background:#E3F2FD;border-left:6px solid #007AFF;' : 'border-left:4px solid #34C759;'}">
           <div style="flex:1; min-width:0; pointer-events:none;"><div class="result-month">📍 ${monthText}</div><div style="font-size:17px; line-height:1.5; overflow-wrap:anywhere;">${categoryHtml} ${detail}</div></div>
-          <div class="result-amount" style="text-align:right; flex-shrink:0; margin-top:0; pointer-events:none;">$ ${amountText}</div>
+          <div class="result-amount" style="text-align:right; flex-shrink:0; margin-top:0; pointer-events:none;">${amountText}</div>
         </div>`;
       }).join('');
       updateSelectAllButtonLabel();
@@ -950,11 +951,22 @@
       if (rocYear <= 0 || monthNumber > 12 || dayNumber > 31) throw new Error('新增帳目的日期超出有效範圍');
 
       // 與同步資料使用相同欄位及月份／日期格式。故意直接 append，不去重，避免誤刪使用者有意輸入的相同帳目。
+      const itemText = String(data.item || '').trim();
+      const amountText = String(data.amount == null ? '' : data.amount).trim();
+      const categoryText = String(data.category || '').trim();
+      const datePrefix = `${rocYear}/${String(monthNumber).padStart(2, '0')}/${String(dayNumber).padStart(2, '0')}`;
+      // 與後端寫入規則保持一致：收入／固定支出不加日期前綴，一般支出加日期；金額空白時不補「undefined元」。
+      let detailText;
+      if (categoryText === '固定支出' || categoryText === '收入') {
+        detailText = itemText;
+      } else {
+        detailText = `${datePrefix} ${itemText}${amountText ? ` ${amountText}元` : ''}`;
+      }
       const newRecord = {
         month: `${rocYear}年 ${monthNumber}月`,
-        category: String(data.category || ''),
-        detail: `${rocYear}/${String(monthNumber).padStart(2, '0')}/${String(dayNumber).padStart(2, '0')} ${String(data.item || '').trim()}`,
-        amount: String(data.amount == null ? '' : data.amount)
+        category: categoryText,
+        detail: detailText,
+        amount: amountText
       };
       cachedData.push(newRecord);
       localStorage.setItem(dataKey, JSON.stringify(cachedData));
@@ -993,7 +1005,9 @@
         item: document.getElementById('itemInput').value,
         amount: document.getElementById('amountInput').value
       };
-      if (!data.item || !data.amount) return alert('請填妥資料！');
+      data.item = String(data.item || '').trim();
+      data.amount = String(data.amount == null ? '' : data.amount).trim();
+      if (!data.date || !data.category || !data.item) return alert('請填寫日期、分類及項目說明；金額可以先留白。');
 
       const statusEl = document.getElementById('syncStatus');
       startButtonLoading(btn, '新增中...');
@@ -1197,6 +1211,8 @@
         document.getElementById('syncStatus').innerText = info || '尚未同步資料';
         document.getElementById('resultBox').innerHTML = '';
       }
+      // 同步後將雲端實際出現的新分類加入記帳與編輯下拉選單。
+      loadCategories();
       populateRecordFilterSelectors();
       if (recordFilterHasRun) renderFilteredRecords(false);
     }
@@ -1263,9 +1279,11 @@
           const amount = parseFloat(String(item.amount == null ? '0' : item.amount).replace(/,/g, '')) || 0;
           const key = getRecordSelectionKey(item);
           const selected = selectedItemsMap.has(key);
+          const amountRaw = String(item.amount == null ? '' : item.amount).trim();
+          const amountDisplay = amountRaw ? `$ ${escapeHtml(amountRaw)}` : '（未填金額）';
           return `<div id="${domId}" class="result-item" data-select-key="${escapeHtml(key)}" data-select-amount="${amount}" data-item="${escapeHtml(safeItem)}" style="display:flex; justify-content:space-between; align-items:center; cursor:pointer; user-select:none; ${selected ? 'background:#E3F2FD; border-left:6px solid #007AFF;' : 'border-left:4px solid #34C759;'}" oncontextmenu="return false;" ontouchstart="startPress(event, this)" ontouchend="endPress(event)" onmousedown="startPress(event, this)" onmouseup="endPress(event)" onmouseleave="endPress(event)" onclick="itemClickFromElement(event, this)">
             <div style="flex:1; pointer-events:none;"><div class="result-month">📍 ${escapeHtml(item.month || '')}</div><div style="font-size:18px;">${item.category ? `<span class="result-category">${escapeHtml(item.category)}</span>` : ''} ${escapeHtml(item.detail || '')}</div></div>
-            <div class="result-amount" style="text-align:right; pointer-events:none;">$ ${escapeHtml(item.amount == null ? '0' : item.amount)}</div></div>`;
+            <div class="result-amount" style="text-align:right; pointer-events:none;">${amountDisplay}</div></div>`;
         }).join('');
 
         if (isOverLimit) {
@@ -1390,7 +1408,18 @@
       if (recordFilterHasRun) renderFilteredRecords(false);
     }
 
-    function openEditModal(itemStr) { const i = JSON.parse(decodeURIComponent(itemStr)); document.getElementById('editMonth').value = i.month; document.getElementById('editOldCategory').value = i.category; document.getElementById('editOldDetail').value = i.detail; document.getElementById('editOldAmount').value = i.amount; document.getElementById('editMonthDisplay').innerText = `📍 ${i.month}`; document.getElementById('editDetailInput').value = i.detail; document.getElementById('editAmountInput').value = i.amount; document.getElementById('editCategoryInput').innerHTML = (localStorage.getItem(getStoreKey('myCustomCategories'))||defaultCategories).split(',').filter(t=>t.trim()!=='').map(c => `<option value="${c}">${c}</option>`).join(''); document.getElementById('editCategoryInput').value = i.category; document.getElementById('editModal').style.display = 'flex'; }
+    function openEditModal(itemStr) {
+      const i = JSON.parse(decodeURIComponent(itemStr));
+      document.getElementById('editMonth').value = i.month || '';
+      document.getElementById('editOldCategory').value = i.category || '';
+      document.getElementById('editOldDetail').value = i.detail || '';
+      document.getElementById('editOldAmount').value = i.amount == null ? '' : i.amount;
+      document.getElementById('editMonthDisplay').innerText = `📍 ${i.month || ''}`;
+      document.getElementById('editDetailInput').value = i.detail || '';
+      document.getElementById('editAmountInput').value = i.amount == null ? '' : i.amount;
+      populateCategorySelect(document.getElementById('editCategoryInput'), i.category || '');
+      document.getElementById('editModal').style.display = 'flex';
+    }
     function closeEditModal() { document.getElementById('editModal').style.display = 'none'; }
     async function saveEditRecord() {
       const saveBtn = document.getElementById('saveEditBtn');
@@ -1407,7 +1436,9 @@
         newDetail: document.getElementById('editDetailInput').value,
         newAmount: document.getElementById('editAmountInput').value
       };
-      if (!d.newDetail || !d.newAmount) return alert('請填寫完整');
+      d.newDetail = String(d.newDetail || '').trim();
+      d.newAmount = String(d.newAmount == null ? '' : d.newAmount).trim();
+      if (!d.newDetail || !d.newCategory) return alert('請填寫項目說明並選擇分類；金額可以先留白。');
 
       startButtonLoading(saveBtn, '正在儲存修改...');
       if (deleteBtn) deleteBtn.disabled = true;
@@ -1491,7 +1522,30 @@
     function removeModalItem(i) { tempEditingItems.splice(i, 1); renderModalList(); }
     function addModalItem() { const val = document.getElementById('modalNewInput').value.trim().replace(/,/g, ''); if (val) { tempEditingItems.push(val); document.getElementById('modalNewInput').value = ''; renderModalList(); } }
     function saveSettingsModal() { localStorage.setItem(getStoreKey(currentEditMode === 'categories' ? 'myCustomCategories' : 'myCustomTags'), tempEditingItems.join(',')); currentEditMode === 'categories' ? loadCategories() : loadQuickTags(); closeSettingsModal(); backupToDrive(true); }
-    function loadCategories() { const cats = (localStorage.getItem(getStoreKey('myCustomCategories')) || defaultCategories).split(',').filter(t=>t.trim()!==''); document.getElementById('categoryInput').innerHTML = cats.map(c => `<option value="${c}">${c}</option>`).join(''); }
+    function getKnownCategories() {
+      const saved = localStorage.getItem(getStoreKey('myCustomCategories')) || defaultCategories;
+      const categorySet = new Set(saved.split(',').map(c => c.trim()).filter(Boolean));
+      (localLedgerData || []).forEach(item => {
+        const category = String(item && item.category || '').trim();
+        if (category && category !== '系統彙總') categorySet.add(category);
+      });
+      return Array.from(categorySet);
+    }
+    function populateCategorySelect(select, selectedCategory) {
+      if (!select) return;
+      const previous = String(selectedCategory == null ? select.value : selectedCategory);
+      select.innerHTML = '';
+      getKnownCategories().forEach(category => select.add(new Option(category, category)));
+      if (previous && !Array.from(select.options).some(option => option.value === previous)) {
+        select.add(new Option(previous, previous));
+      }
+      if (previous && Array.from(select.options).some(option => option.value === previous)) select.value = previous;
+    }
+    function loadCategories() {
+      const select = document.getElementById('categoryInput');
+      const previous = select ? select.value : '';
+      populateCategorySelect(select, previous);
+    }
     function loadQuickTags() { const tags = (localStorage.getItem(getStoreKey('myCustomTags')) || defaultTags).split(',').filter(t=>t.trim()!==''); document.getElementById('quickTagsContainer').innerHTML = tags.map(tag => `<span onclick="document.getElementById('itemInput').value='${tag} ';document.getElementById('itemInput').focus();">✨ ${tag}</span>`).join(''); }
     function updateDatalist() { if (!localLedgerData) return; const uniqueItems = new Set(); localLedgerData.filter(i=>i.category!=="系統彙總").forEach(item => { let cleanName = item.detail.trim().replace(/^(\d{2,3}\/)?\d{1,2}\/\d{1,2}\s*/, '').replace(/[\s\-$]*(NT\$?\vert{}\$)?\d+(?:\.\d+)?[元\s]*$/i, '').trim(); if (cleanName) uniqueItems.add(cleanName); }); document.getElementById('historySuggestions').innerHTML = Array.from(uniqueItems).map(v => `<option value="${v}">`).join(''); }
 
