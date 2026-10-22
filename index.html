@@ -267,10 +267,10 @@
         <select id="chartYearSelect" onchange="renderChart()" style="margin-top:0; padding:10px;"></select>
         <span id="chartYearLabel" style="font-weight: bold; color: #555;">年</span>
         <select id="chartMonthSelect" onchange="renderChart()" style="margin-top:0; padding:10px;">
-          <option value="1月">1月</option><option value="2月">2月</option><option value="3月">3月</option>
-          <option value="4月">4月</option><option value="5月">5月</option><option value="6月">6月</option>
-          <option value="7月">7月</option><option value="8月">8月</option><option value="9月">9月</option>
-          <option value="10月">10月</option><option value="11月">11月</option><option value="12月">12月</option>
+          <option value="12月">12月</option><option value="11月">11月</option><option value="10月">10月</option>
+          <option value="9月">9月</option><option value="8月">8月</option><option value="7月">7月</option>
+          <option value="6月">6月</option><option value="5月">5月</option><option value="4月">4月</option>
+          <option value="3月">3月</option><option value="2月">2月</option><option value="1月">1月</option>
         </select>
       </div>
       
@@ -440,6 +440,8 @@
     const apiUrl = "https://script.google.com/macros/s/AKfycbxvVEOlqWPu-MraLhOcOp2OkAX0zD5tOLJFwlbHkqtWQAu9MRBh4I3ek4U9yn0jfevl/exec";
     let localLedgerData = []; let expenseChartInstance = null; let currentLedger = 'home'; 
     let chartMode = 'month'; let chartType = 'category';
+    // 第一次開啟分析時預設當年、當月；之後重新整理選項時保留使用者手動選擇。
+    let chartSelectorsInitialized = false;
     let deferredInstallPrompt = null;
     const isIOSDevice = /iphone|ipad|ipod/i.test(navigator.userAgent) && !window.MSStream;
 
@@ -1728,24 +1730,28 @@
 
     function populateChartSelectors() {
       const years = new Set();
-      localLedgerData.forEach(item => {
-        const m = item.month.match(/(\d+)年/);
-        if (m) years.add(parseInt(m[1]));
+      (localLedgerData || []).forEach(item => {
+        const m = String(item.month || '').match(/(\d+)年/);
+        if (m) years.add(parseInt(m[1], 10));
       });
-      const currentTwYear = new Date().getFullYear() - 1911; 
+      const now = new Date();
+      const currentTwYear = now.getFullYear() - 1911;
+      const currentMonth = (now.getMonth() + 1) + "月";
       years.add(currentTwYear);
       
       const selectY = document.getElementById('chartYearSelect');
-      const currentValY = selectY.value; 
-      selectY.innerHTML = '';
-      Array.from(years).sort((a,b)=>b-a).forEach(y => selectY.appendChild(new Option(y + "年", y)));
-      
-      if(Array.from(selectY.options).some(o => o.value == currentValY)) selectY.value = currentValY; 
-      else selectY.value = currentTwYear;
-
-      const currentMonth = (new Date().getMonth() + 1) + "月";
       const selectM = document.getElementById('chartMonthSelect');
-      if(!selectM.value) selectM.value = currentMonth;
+      const previousYear = selectY.value;
+      const previousMonth = selectM.value;
+      selectY.innerHTML = '';
+      Array.from(years).sort((a, b) => b - a).forEach(y => selectY.appendChild(new Option(y + "年", String(y))));
+      
+      // 第一次顯示分析頁時採用目前年月；往後重新整理年份清單時，保留使用者已選的年月。
+      const yearExists = Array.from(selectY.options).some(o => o.value === previousYear);
+      selectY.value = chartSelectorsInitialized && yearExists ? previousYear : String(currentTwYear);
+      const monthExists = Array.from(selectM.options).some(o => o.value === previousMonth);
+      selectM.value = chartSelectorsInitialized && monthExists ? previousMonth : currentMonth;
+      chartSelectorsInitialized = true;
     }
 
     function renderChart() {
