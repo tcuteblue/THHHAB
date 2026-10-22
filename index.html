@@ -231,11 +231,11 @@
         <div class="record-filter-grid">
           <div>
             <label for="recordFilterYear" style="margin-top:0;">年度</label>
-            <select id="recordFilterYear"></select>
+            <select id="recordFilterYear" onchange="onRecordFilterChanged()"></select>
           </div>
           <div>
             <label for="recordFilterMonth" style="margin-top:0;">月份</label>
-            <select id="recordFilterMonth">
+            <select id="recordFilterMonth" onchange="onRecordFilterChanged()">
               <option value="1">1月</option><option value="2">2月</option><option value="3">3月</option>
               <option value="4">4月</option><option value="5">5月</option><option value="6">6月</option>
               <option value="7">7月</option><option value="8">8月</option><option value="9">9月</option>
@@ -244,10 +244,12 @@
           </div>
           <div class="filter-category">
             <label for="recordFilterCategory" style="margin-top:0;">記帳分類</label>
-            <select id="recordFilterCategory"></select>
+            <select id="recordFilterCategory" onchange="onRecordFilterChanged()"></select>
           </div>
         </div>
-        <button type="button" class="settings-action" style="margin-top:14px;" onclick="renderFilteredRecords(true)">顯示明細</button>
+        <p id="periodRecordHelp" style="margin:12px 2px 8px; padding:10px 12px; border-radius:10px; background:#F1F8E9; color:#45633B; font-size:13px; line-height:1.6;">
+          💡 操作說明：<b>單擊明細</b>可編輯或刪除；<b>按住明細約 0.5 秒</b>可進入多選模式。進入多選後，單擊其他明細可勾選／取消勾選，再使用上方的全選或刪除功能。
+        </p>
         <div class="result-box" id="filteredResultBox"></div>
       </div>
     </div> 
@@ -268,10 +270,10 @@
         <select id="chartYearSelect" onchange="renderChart()" style="margin-top:0; padding:10px;"></select>
         <span id="chartYearLabel" style="font-weight: bold; color: #555;">年</span>
         <select id="chartMonthSelect" onchange="renderChart()" style="margin-top:0; padding:10px;">
-          <option value="12月">12月</option><option value="11月">11月</option><option value="10月">10月</option>
-          <option value="9月">9月</option><option value="8月">8月</option><option value="7月">7月</option>
-          <option value="6月">6月</option><option value="5月">5月</option><option value="4月">4月</option>
-          <option value="3月">3月</option><option value="2月">2月</option><option value="1月">1月</option>
+          <option value="1月">1月</option><option value="2月">2月</option><option value="3月">3月</option>
+          <option value="4月">4月</option><option value="5月">5月</option><option value="6月">6月</option>
+          <option value="7月">7月</option><option value="8月">8月</option><option value="9月">9月</option>
+          <option value="10月">10月</option><option value="11月">11月</option><option value="12月">12月</option>
         </select>
       </div>
       
@@ -832,6 +834,7 @@
 
     // ======== 帳目分頁：關鍵字搜尋 / 年月分類檢視 ========
     let recordFilterHasRun = false;
+    let recordFilterSelectorsInitialized = false;
 
     function switchAccountMode(mode) {
       const isKeyword = mode === 'keyword';
@@ -843,8 +846,20 @@
       document.getElementById('periodModeBtn').setAttribute('aria-selected', isKeyword ? 'false' : 'true');
       if (!isKeyword) {
         populateRecordFilterSelectors();
-        if (recordFilterHasRun) renderFilteredRecords(false);
+        // 第一次進入年月分類檢視時，直接顯示預設年月的明細；之後切換回來則沿用目前選擇。
+        if (!recordFilterHasRun) {
+          recordFilterHasRun = true;
+          renderFilteredRecords(false);
+        } else {
+          renderFilteredRecords(false);
+        }
       }
+    }
+
+    // 年、月或分類變更時立即刷新明細，不再需要另外按「顯示明細」。
+    function onRecordFilterChanged() {
+      recordFilterHasRun = true;
+      renderFilteredRecords(false);
     }
 
     function populateRecordFilterSelectors() {
@@ -855,7 +870,7 @@
 
       const currentTwYear = new Date().getFullYear() - 1911;
       const previousYear = yearSelect.value;
-      const previousMonth = monthSelect.value;
+      const previousMonth = recordFilterSelectorsInitialized ? monthSelect.value : String(new Date().getMonth() + 1);
       const previousCategory = categorySelect.value;
       const years = new Set([currentTwYear]);
       (localLedgerData || []).forEach(item => {
@@ -883,6 +898,7 @@
       categorySelect.add(new Option('全部分類', '__ALL__'));
       categories.forEach(category => categorySelect.add(new Option(category, category)));
       categorySelect.value = categories.includes(previousCategory) || previousCategory === '__ALL__' ? previousCategory : '__ALL__';
+      recordFilterSelectorsInitialized = true;
     }
 
     function getRecordSortValue(item) {
