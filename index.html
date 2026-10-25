@@ -1074,14 +1074,26 @@
           document.getElementById('itemInput').value = '';
           document.getElementById('amountInput').value = '';
           document.getElementById('dateInput').value = getTodayDateString(localStorage.getItem('useTaiwanTime') !== 'false');
+          const rowsExpanded = String(res.message || '').includes('已增加 10 列空欄位');
           if (statusEl) {
-            statusEl.innerText = cacheUpdated
-              ? '✅ 記帳成功；此筆已加入本機快取。其他裝置的更新仍需同步。'
-              : '⚠️ 雲端記帳成功，但本機快取未能更新；請執行「本月極速同步」。';
+            statusEl.innerText = rowsExpanded
+              ? (cacheUpdated
+                  ? '✅ 已增加 10 列空欄位，記帳成功；此筆已加入本機快取。其他裝置的更新仍需同步。'
+                  : '✅ 已增加 10 列空欄位，雲端記帳成功；本機快取未能更新，請執行「本月極速同步」。')
+              : (cacheUpdated
+                  ? '✅ 記帳成功；此筆已加入本機快取。其他裝置的更新仍需同步。'
+                  : '⚠️ 雲端記帳成功，但本機快取未能更新；請執行「本月極速同步」。');
             statusEl.style.color = cacheUpdated ? '#2478D4' : '#FF9500';
           }
-          if (cacheUpdated) alert('✅ 記帳成功！新帳目已立即加入本機快取。');
-          else alert('✅ 雲端記帳成功！但本機快取未能更新，請稍後執行「本月極速同步」。');
+          if (cacheUpdated) {
+            alert(rowsExpanded
+              ? '✅ 已增加 10 列空欄位，並成功新增帳目！'
+              : '✅ 記帳成功！新帳目已立即加入本機快取。');
+          } else {
+            alert(rowsExpanded
+              ? '✅ 已增加 10 列空欄位，並成功新增雲端帳目！但本機快取未能更新，請稍後執行「本月極速同步」。'
+              : '✅ 雲端記帳成功！但本機快取未能更新，請稍後執行「本月極速同步」。');
+          }
         } else {
           if (statusEl) {
             statusEl.innerText = '❌ 新增帳目失敗，尚未確認寫入成功';
