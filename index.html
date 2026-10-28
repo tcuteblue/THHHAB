@@ -217,6 +217,13 @@
       <input type="text" id="itemInput" placeholder="例如：晚餐 石二鍋" list="historySuggestions">
       <datalist id="historySuggestions"></datalist>
 
+      <!--【LINE Pay Money 開關文字】日後要修改核取方塊旁的文字，請修改下方 span 的內容。 -->
+      <label for="openLinePayAfterAdd" style="display:flex; align-items:center; gap:9px; margin:12px 0 14px; font-size:14px; font-weight:normal; cursor:pointer;">
+        <!-- 預設不勾選；若要改成預設勾選，才將此處改為 checked。 -->
+        <input type="checkbox" id="openLinePayAfterAdd" style="width:18px; height:18px; margin:0; flex:0 0 auto;">
+        <span>新增帳目後開啟 Line Pay Money</span>
+      </label>
+
       <button id="submitDataBtn" type="button" onclick="submitData()">新增帳目</button>
 
     </div>
@@ -1059,6 +1066,7 @@
     async function submitData() {
       const btn = document.getElementById('submitDataBtn');
       if (btn && btn.disabled) return;
+      const openLinePayAfterAdd = !!document.getElementById('openLinePayAfterAdd')?.checked;
       const ledgerAtSubmission = currentLedger;
       const data = {
         action: 'add',
@@ -1115,6 +1123,13 @@
             alert(rowsExpanded
               ? '✅ 已增加 10 列空欄位，並成功新增雲端帳目！但本機快取未能更新，請稍後執行「本月極速同步」。'
               : '✅ 雲端記帳成功！但本機快取未能更新，請稍後執行「本月極速同步」。');
+          }
+          const linePayCheckbox = document.getElementById('openLinePayAfterAdd');
+          if (linePayCheckbox) linePayCheckbox.checked = false;
+          if (openLinePayAfterAdd) {
+            //【LINE Pay Money 跳轉網址】日後要更換連結，請修改下一行引號內的網址。
+            // 只有確認雲端新增成功後才跳轉；取消勾選時不會開啟。
+            window.location.href = 'https://line.me/R/pay/';
           }
         } else {
           if (statusEl) {
