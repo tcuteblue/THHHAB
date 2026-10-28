@@ -129,6 +129,15 @@
     .modal-actions { display: flex; gap: 10px; }
     .modal-actions button { margin-top: 0; flex: 1; padding: 14px; font-size: 18px; }
     .btn-cancel { background: #E0E0E0; color: #333; }
+    .record-action-card { width: 90%; max-width: 340px; padding: 18px; }
+    .record-action-card .modal-title { font-size: 20px; margin-bottom: 12px; }
+    .record-action-options { display: flex; flex-direction: column; gap: 9px; }
+    button.record-action-option { width: 100%; margin: 0; padding: 13px 14px; display: flex; align-items: center; justify-content: flex-start; gap: 12px; text-align: left; font-size: 17px; line-height: 1.2; border: 1px solid transparent; box-shadow: none; }
+    button.record-action-edit { background: #F0F2F5; color: #303642; border-color: #E1E5EA; }
+    button.record-action-copy { background: #E5F5E9; color: #18733A; border-color: #C5E8CD; }
+    button.record-action-delete { background: #FCEAEA; color: #B42318; border-color: #F5C7C5; }
+    button.record-action-cancel { width: 100%; margin: 0; padding: 11px; background: #E0E0E0; color: #333; font-size: 16px; }
+    .record-action-icon { width: 22px; flex: 0 0 22px; text-align: center; font-size: 19px; }
     .settings-modal-card { max-height: 85vh; overflow-y: auto; }
 
     /* 計算機採底部面板呈現，面板頂端依金額欄位位置計算，不遮住正在輸入的欄位。 */
@@ -383,6 +392,18 @@
         <button id="saveEditBtn" type="button" style="background: #34A853; margin-top: 0; flex: 1; font-size: 16px;" onclick="saveEditRecord()">💾 儲存修改</button>
       </div>
       <button id="editCancelBtn" type="button" class="btn-cancel" style="margin-top: 10px; width: 100%; padding: 12px; font-size: 16px;" onclick="closeEditModal()">取消</button>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="recordActionModal" role="dialog" aria-modal="true" aria-labelledby="recordActionTitle">
+    <div class="modal-card record-action-card">
+      <div class="modal-title" id="recordActionTitle">選擇操作</div>
+      <div class="record-action-options">
+        <button type="button" class="record-action-option record-action-edit" onclick="chooseRecordAction('edit')"><span class="record-action-icon" aria-hidden="true">✏️</span><span>編輯紀錄</span></button>
+        <button type="button" class="record-action-option record-action-copy" onclick="chooseRecordAction('copy')"><span class="record-action-icon" aria-hidden="true">📄</span><span>複製新增</span></button>
+        <button type="button" class="record-action-option record-action-delete" onclick="chooseRecordAction('delete')"><span class="record-action-icon" aria-hidden="true">🗑️</span><span>刪除紀錄</span></button>
+        <button type="button" class="record-action-cancel" onclick="closeRecordActionModal()">取消</button>
+      </div>
     </div>
   </div>
 
@@ -1897,7 +1918,146 @@ ${deleteErr.message || deleteErr}`); return false; }
       if (multiSelectMode) {
         toggleSelection(element.id, element.dataset.selectKey, Number(element.dataset.selectAmount) || 0);
       } else {
-        openEditModal(element.dataset.item);
+        // 萬用搜尋與年月分類檢視共用同一個單筆操作選單。
+        openRecordActionModal(element.dataset.item);
+      }
+    }
+
+    // ======== 單筆帳目操作：編輯／複製新增／刪除 ========
+    let recordActionItem = null;
+    let recordActionItemStr = '';
+    let recordActionLedger = 'home';
+
+    function openRecordActionModal(itemStr) {
+      try {
+        const record = JSON.parse(decodeURIComponent(itemStr));
+        if (!record || record.category === '系統彙總') return;
+        recordActionItem = record;
+        recordActionItemStr = itemStr;
+        recordActionLedger = currentLedger;
+        document.getElementById('recordActionModal').style.display = 'flex';
+      } catch (err) {
+        alert('無法讀取這筆帳目，請重新同步後再試。');
+      }
+    }
+
+    function closeRecordActionModal() {
+      const modal = document.getElementById('recordActionModal');
+      if (modal) modal.style.display = 'none';
+      recordActionItem = null;
+      recordActionItemStr = '';
+    }
+
+    function chooseRecordAction(action) {
+      if (!recordActionItem) return;
+      const record = recordActionItem;
+      const itemStr = recordActionItemStr;
+      const ledgerName = recordActionLedger;
+
+      if (action === 'edit') {
+        closeRecordActionModal();
+        openEditModal(itemStr);
+        return;
+      }
+      if (action === 'copy') {
+        closeRecordActionModal();
+        prepareCopiedRecord(record);
+        return;
+      }
+      if (action === 'delete') {
+        if (!confirm('確定刪除這筆紀錄？')) return;
+        closeRecordActionModal();
+        deleteRecordFromAction(record, ledgerName);
+        return;
+      }
+      closeRecordActionModal();
+    }
+
+    function getCopyDescription(record) {
+      let detail = String(record && record.detail != null ? record.detail : '').trim();
+      const category = String(record && record.category || '').trim();
+      // 一般支出明細會由系統附加民國日期及金額；複製到輸入表單時只帶入原始項目說明。
+      if (category !== '固定支出' && category !== '收入') {
+        detail = detail.replace(/^\d{2,3}\/\d{1,2}\/\d{1,2}\s*/, '');
+        const trailingAmount = detail.match(/\s*(-?[\d,]+(?:\.\d+)?)元\s*$/);
+        const sourceAmount = String(record && record.amount != null ? record.amount : '').trim();
+        if (trailingAmount && sourceAmount) {
+          const detailAmountNumber = Number(trailingAmount[1].replace(/,/g, ''));
+          const sourceAmountNumber = Number(sourceAmount.replace(/,/g, ''));
+          if (Number.isFinite(detailAmountNumber) && Number.isFinite(sourceAmountNumber) && detailAmountNumber === sourceAmountNumber) {
+            detail = detail.slice(0, trailingAmount.index).trim();
+          }
+        }
+      }
+      return detail;
+    }
+
+    function prepareCopiedRecord(record) {
+      // 複製只預填記帳表單，不會在此處寫入雲端；需由使用者按「新增帳目」才送出。
+      switchTab('add');
+      const useTaiwanTime = localStorage.getItem('useTaiwanTime') !== 'false';
+      document.getElementById('dateInput').value = getTodayDateString(useTaiwanTime);
+      populateCategorySelect(document.getElementById('categoryInput'), String(record.category || ''));
+      document.getElementById('amountInput').value = record.amount == null ? '' : String(record.amount);
+      document.getElementById('itemInput').value = getCopyDescription(record);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    async function deleteRecordFromAction(record, ledgerName) {
+      const data = {
+        action: 'delete',
+        ledger: ledgerName,
+        month: String(record.month || ''),
+        category: String(record.category || ''),
+        detail: String(record.detail || ''),
+        amount: String(record.amount == null ? '' : record.amount)
+      };
+      let result;
+      try {
+        const response = await fetch(apiUrl, { method: 'POST', body: JSON.stringify(data) });
+        result = await response.json();
+        if (result.status !== 'success') throw new Error(result.message || '雲端未能刪除紀錄');
+      } catch (err) {
+        alert('❌ 刪除失敗：' + (err && err.message ? err.message : '連線錯誤，請確認雲端狀態後再試。'));
+        return;
+      }
+
+      // 雲端已成功刪除；若本機快取更新失敗，不能誤報成雲端刪除失敗。
+      try {
+        const dataKey = getStoreKeyForLedger(ledgerName, 'myLedgerData');
+        const stored = localStorage.getItem(dataKey);
+        let cache = [];
+        if (stored) {
+          cache = JSON.parse(stored);
+          if (!Array.isArray(cache)) cache = [];
+        } else if (ledgerName === currentLedger) {
+          cache = Array.isArray(localLedgerData) ? localLedgerData.slice() : [];
+        }
+        // 與既有刪除行為一致：只移除第一筆欄位完全相符的本機紀錄，不一次刪掉重複帳目。
+        const index = cache.findIndex(item =>
+          String(item.month || '') === data.month &&
+          String(item.category || '') === data.category &&
+          String(item.detail || '') === data.detail &&
+          String(item.amount == null ? '' : item.amount) === data.amount
+        );
+        if (index !== -1) cache.splice(index, 1);
+        localStorage.setItem(dataKey, JSON.stringify(cache));
+
+        if (ledgerName === currentLedger) {
+          localLedgerData = cache;
+          filterLocalData();
+          populateRecordFilterSelectors();
+          if (recordFilterHasRun) renderFilteredRecords(false);
+          const chartTab = document.querySelectorAll('.tab')[2];
+          if (chartTab && chartTab.classList.contains('active')) {
+            populateChartSelectors();
+            renderChart();
+          }
+        }
+        alert('✅ 刪除成功');
+      } catch (cacheErr) {
+        console.error('雲端刪除成功，但本機快取更新失敗：', cacheErr);
+        alert('✅ 雲端已刪除這筆紀錄，但本機快取未能更新，請到「設定」執行同步。');
       }
     }
 
