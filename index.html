@@ -132,12 +132,13 @@
     .record-action-card { width: 90%; max-width: 340px; padding: 18px; }
     .record-action-card .modal-title { font-size: 20px; margin-bottom: 12px; }
     .record-action-options { display: flex; flex-direction: column; gap: 9px; }
-    button.record-action-option { width: 100%; margin: 0; padding: 13px 14px; display: flex; align-items: center; justify-content: flex-start; gap: 12px; text-align: left; font-size: 17px; line-height: 1.2; border: 1px solid transparent; box-shadow: none; }
+    button.record-action-option { position: relative; width: 100%; margin: 0; padding: 13px 16px; display: flex; align-items: center; justify-content: center; text-align: center; font-size: 17px; line-height: 1.2; border: 1px solid transparent; box-shadow: none; }
     button.record-action-edit { background: #F0F2F5; color: #303642; border-color: #E1E5EA; }
     button.record-action-copy { background: #E5F5E9; color: #18733A; border-color: #C5E8CD; }
     button.record-action-delete { background: #FCEAEA; color: #B42318; border-color: #F5C7C5; }
     button.record-action-cancel { width: 100%; margin: 0; padding: 11px; background: #E0E0E0; color: #333; font-size: 16px; }
-    .record-action-icon { width: 22px; flex: 0 0 22px; text-align: center; font-size: 19px; }
+    .record-action-content { display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
+    .record-action-icon { position: static; display: inline-block; transform: none; width: auto; text-align: center; font-size: 19px; line-height: 1; pointer-events: none; }
     .settings-modal-card { max-height: 85vh; overflow-y: auto; }
 
     /* 計算機採底部面板呈現，面板頂端依金額欄位位置計算，不遮住正在輸入的欄位。 */
@@ -399,9 +400,9 @@
     <div class="modal-card record-action-card">
       <div class="modal-title" id="recordActionTitle">選擇操作</div>
       <div class="record-action-options">
-        <button type="button" class="record-action-option record-action-edit" onclick="chooseRecordAction('edit')"><span class="record-action-icon" aria-hidden="true">✏️</span><span>編輯紀錄</span></button>
-        <button type="button" class="record-action-option record-action-copy" onclick="chooseRecordAction('copy')"><span class="record-action-icon" aria-hidden="true">📄</span><span>複製新增</span></button>
-        <button type="button" class="record-action-option record-action-delete" onclick="chooseRecordAction('delete')"><span class="record-action-icon" aria-hidden="true">🗑️</span><span>刪除紀錄</span></button>
+        <button type="button" class="record-action-option record-action-edit" onclick="chooseRecordAction('edit')"><span class="record-action-content"><span class="record-action-icon" aria-hidden="true">✏️</span><span>編輯紀錄</span></span></button>
+        <button type="button" class="record-action-option record-action-copy" onclick="chooseRecordAction('copy')"><span class="record-action-content"><span class="record-action-icon" aria-hidden="true">📄</span><span>複製新增</span></span></button>
+        <button type="button" class="record-action-option record-action-delete" onclick="chooseRecordAction('delete')"><span class="record-action-content"><span class="record-action-icon" aria-hidden="true">🗑️</span><span>刪除紀錄</span></span></button>
         <button type="button" class="record-action-cancel" onclick="closeRecordActionModal()">取消</button>
       </div>
     </div>
