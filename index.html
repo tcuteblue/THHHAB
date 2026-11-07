@@ -119,6 +119,8 @@
 
     .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 3000; justify-content: center; align-items: center; backdrop-filter: blur(3px); }
     .modal-card { background: white; width: 90%; max-width: 400px; border-radius: 16px; padding: 25px; box-sizing: border-box; box-shadow: 0 10px 25px rgba(0,0,0,0.1); animation: popIn 0.3s ease-out; }
+    /* 編輯帳目視窗在手機上可自行捲動，避免計算機開啟時金額欄位被擠出可視範圍。 */
+    #editModal .modal-card { max-height: calc(100vh - 32px); max-height: calc(100dvh - 32px); overflow-y: auto; overscroll-behavior: contain; }
     .modal-title { font-size: 22px; font-weight: bold; margin-bottom: 15px; color: #333; text-align: center; }
     .modal-list { max-height: 250px; overflow-y: auto; margin-bottom: 15px; background: #fafafa; border-radius: 8px; padding: 5px; }
     .modal-list-item { display: flex; justify-content: space-between; align-items: center; padding: 12px; border-bottom: 1px solid #eee; font-size: 18px; }
@@ -210,12 +212,18 @@
       <input type="text" id="amountInput" placeholder="🧮 點擊輸入金額..." onclick="openCalcModal('amountInput')" readonly style="cursor: pointer; background: #F4F8FF; color: #007AFF; font-weight: bold; text-align: center; border-color: #007AFF;">
 
       <label>🏷️ 分類</label>
-      <select id="categoryInput"></select>
+      <select id="categoryInput" onchange="updateTransitHandoffVisibility()"></select>
 
       <label>📝 項目說明</label>
       <div class="quick-tags" id="quickTagsContainer"></div>
       <input type="text" id="itemInput" placeholder="例如：晚餐 石二鍋" list="historySuggestions">
       <datalist id="historySuggestions"></datalist>
+
+      <!--【電子票證交接開關】只有新增支出時顯示，預設不勾選。 -->
+      <label id="transitHandoffOption" for="handoffToTransitAfterAdd" style="display:none; align-items:center; gap:11px; margin:14px 0 12px; padding:11px 13px; font-size:16px; line-height:1.45; font-weight:700; color:#1d4ed8; background:#eff6ff; border:1px solid #93c5fd; border-radius:10px; cursor:pointer;">
+        <input type="checkbox" id="handoffToTransitAfterAdd" style="width:21px; height:21px; margin:0; flex:0 0 auto; accent-color:#2563eb;">
+        <span>新增支出後開啟電子票證管家扣款</span>
+      </label>
 
       <!--【LINE Pay Money 開關文字】日後要修改核取方塊旁的文字，請修改下方 span 的內容。 -->
       <label for="openLinePayAfterAdd" style="display:flex; align-items:center; gap:11px; margin:14px 0 16px; padding:11px 13px; font-size:17px; line-height:1.45; font-weight:700; color:#14532d; background:#ecfdf3; border:1px solid #86c99d; border-radius:10px; cursor:pointer;">
@@ -1063,10 +1071,74 @@
       return true;
     }
 
+    // ======== 電子票證扣款交接（沿用既有共用 GAS 與電子票證接收協定） ========
+    const TRANSIT_GAS_URL = 'https://script.google.com/macros/s/AKfycbw0wAnCPZkw3nlyx0Eg08Ejk49oG_itD82PqH9IP4X7S4oR5br1NTCmlUJsNfME2kbZ/exec';
+    const TRANSIT_APP_URL = 'https://tcuteblue.github.io/THHJCB/';
+    let transitHandoffInProgress = false;
+
+    function isHouseholdExpenseCategory(category) {
+      // 家用雲帳本以「收入」作為收入分類；固定支出及其他分類均屬支出。
+      return !!String(category || '').trim() && String(category).trim() !== '收入';
+    }
+
+    function updateTransitHandoffVisibility() {
+      const option = document.getElementById('transitHandoffOption');
+      const checkbox = document.getElementById('handoffToTransitAfterAdd');
+      const isExpense = isHouseholdExpenseCategory(document.getElementById('categoryInput')?.value);
+      if (option) option.style.display = isExpense ? 'flex' : 'none';
+      if (!isExpense && checkbox) checkbox.checked = false;
+    }
+
+    function makeHouseholdTransitRequestId() {
+      try { if (window.crypto && crypto.randomUUID) return crypto.randomUUID(); } catch (e) {}
+      return 'household_' + Date.now() + '_' + Math.random().toString(36).slice(2, 12);
+    }
+
+    async function createHouseholdTransitHandoff(record, preopenedWindow) {
+      const requestId = makeHouseholdTransitRequestId();
+      const request = {
+        requestId,
+        // 共用 GAS 的既有交接 API 目前限定此來源代碼；sourceRecordId 前綴用來辨識家用雲帳本。
+        source: 'personal-cloud-ledger',
+        sourceRecordId: 'household:' + requestId,
+        amount: Number(String(record.amount || '').replace(/,/g, '')),
+        memo: String(record.item || ''),
+        date: String(record.date || ''),
+        timeZone: 'tw',
+        createdAt: new Date().toISOString(),
+        status: 'pending'
+      };
+      if (!Number.isFinite(request.amount) || request.amount <= 0) throw new Error('請輸入大於 0 的支出金額，才能交接電子票證扣款。');
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(request.date)) throw new Error('帳目日期格式不正確，無法交接電子票證扣款。');
+
+      const response = await fetch(TRANSIT_GAS_URL, {
+        method: 'POST',
+        body: JSON.stringify({ action: 'create_transit_handoff', request }),
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' }
+      });
+      if (!response.ok) throw new Error('電子票證交接服務連線失敗（HTTP ' + response.status + '）');
+      const result = await response.json();
+      if (!result || result.status !== 'success' || !result.data || result.data.requestId !== requestId) {
+        throw new Error((result && result.message) || '電子票證交接服務回應異常');
+      }
+
+      const targetUrl = new URL(TRANSIT_APP_URL);
+      targetUrl.searchParams.set('ledgerDeduction', '1');
+      targetUrl.searchParams.set('requestId', requestId);
+      if (preopenedWindow && !preopenedWindow.closed) {
+        preopenedWindow.location.replace(targetUrl.href);
+      } else {
+        // 若瀏覽器阻擋新分頁，改在目前頁面開啟；帳目已先成功儲存。
+        window.location.assign(targetUrl.href);
+      }
+      return requestId;
+    }
+
     async function submitData() {
       const btn = document.getElementById('submitDataBtn');
       if (btn && btn.disabled) return;
       const openLinePayAfterAdd = !!document.getElementById('openLinePayAfterAdd')?.checked;
+      const handoffToTransit = !!document.getElementById('handoffToTransitAfterAdd')?.checked;
       const ledgerAtSubmission = currentLedger;
       const data = {
         action: 'add',
@@ -1079,6 +1151,18 @@
       data.item = String(data.item || '').trim();
       data.amount = String(data.amount == null ? '' : data.amount).trim();
       if (!data.date || !data.category || !data.item) return alert('請填寫日期、分類及項目說明；金額可以先留白。');
+      if (handoffToTransit && !isHouseholdExpenseCategory(data.category)) return alert('電子票證交接只適用於支出，收入不能交接扣款。');
+      if (handoffToTransit && !(Number(String(data.amount).replace(/,/g, '')) > 0)) return alert('勾選電子票證扣款交接時，請輸入大於 0 的金額。');
+      if (handoffToTransit && transitHandoffInProgress) return;
+      let transitWindow = null;
+      if (handoffToTransit) {
+        transitHandoffInProgress = true;
+        // 在使用者點擊新增時先開啟空白分頁，避免等待雲端回應後遭瀏覽器封鎖跳轉。
+        transitWindow = window.open('about:blank', '_blank');
+        if (transitWindow) {
+          try { transitWindow.document.write('<!doctype html><title>電子票證管家</title><meta name="viewport" content="width=device-width,initial-scale=1"><body style="font-family:sans-serif;padding:24px;text-align:center">帳目儲存成功後，將自動開啟電子票證管家…</body>'); transitWindow.document.close(); } catch (e) {}
+        }
+      }
 
       const statusEl = document.getElementById('syncStatus');
       startButtonLoading(btn, '新增中...');
@@ -1115,6 +1199,21 @@
                   : '⚠️ 雲端記帳成功，但本機快取未能更新；請執行「本月極速同步」。');
             statusEl.style.color = cacheUpdated ? '#2478D4' : '#FF9500';
           }
+          if (handoffToTransit) {
+            try {
+              if (statusEl) { statusEl.innerText = '✅ 帳目已儲存，正在建立電子票證扣款交接…'; statusEl.style.color = '#2478D4'; }
+              await createHouseholdTransitHandoff(data, transitWindow);
+              transitWindow = null; // 已交由電子票證管家分頁接手
+              const handoffCheckbox = document.getElementById('handoffToTransitAfterAdd');
+              if (handoffCheckbox) handoffCheckbox.checked = false;
+            } catch (handoffError) {
+              if (transitWindow && !transitWindow.closed) transitWindow.close();
+              transitWindow = null;
+              const handoffCheckbox = document.getElementById('handoffToTransitAfterAdd');
+              if (handoffCheckbox) handoffCheckbox.checked = false;
+              alert('帳目已成功儲存，但電子票證交接未完成；尚未執行扣款。\n原因：' + (handoffError.message || '請檢查網路後重試'));
+            }
+          }
           if (cacheUpdated) {
             alert(rowsExpanded
               ? '✅ 已增加 10 列空欄位，並成功新增帳目！'
@@ -1146,6 +1245,8 @@
         }
         alert('⚠️ 連線中斷，無法確認這筆帳目是否已寫入雲端。請先執行同步或檢查雲端帳目，確認沒有新增成功後再重試，以免重複記帳。');
       } finally {
+        if (transitWindow && !transitWindow.closed) transitWindow.close();
+        transitHandoffInProgress = false;
         finishButtonLoading(btn);
         if (btn) {
           btn.classList.remove('has-inline-spinner');
@@ -2284,6 +2385,7 @@ ${deleteErr.message || deleteErr}`); return false; }
         select.add(new Option(previous, previous));
       }
       if (previous && Array.from(select.options).some(option => option.value === previous)) select.value = previous;
+      if (select.id === 'categoryInput' && typeof updateTransitHandoffVisibility === 'function') updateTransitHandoffVisibility();
     }
     function loadCategories() {
       const select = document.getElementById('categoryInput');
@@ -2302,13 +2404,31 @@ ${deleteErr.message || deleteErr}`); return false; }
         calcTargetInput = tId;
         const modal = document.getElementById('calcModal');
         const target = document.getElementById(calcTargetInput);
-        // 面板從金額欄位下緣開始向下展開；保留欄位本身可見，不對背景加霧化或暗色遮罩。
-        const top = target ? Math.max(0, Math.ceil(target.getBoundingClientRect().bottom + 6)) : Math.round(window.innerHeight * 0.4);
-        modal.style.setProperty('--calc-sheet-top', `${top}px`);
-        modal.style.display = 'flex';
-        kpStr = target ? (target.value || '0') : '0';
-        checkCalcStatus();
-        updateAmtUI();
+        const editModal = document.getElementById('editModal');
+        const editCard = editModal ? editModal.querySelector('.modal-card') : null;
+
+        // 編輯視窗先把金額欄位捲到上方可視區，再計算計算機面板起點。
+        // 這樣計算機不會蓋住正在修改的金額欄位。
+        if (target && editModal && editModal.style.display === 'flex' && editCard) {
+            const cardRect = editCard.getBoundingClientRect();
+            const targetRect = target.getBoundingClientRect();
+            const safeBottom = Math.min(window.innerHeight * 0.42, window.innerHeight - 260);
+            if (targetRect.bottom > safeBottom) {
+                editCard.scrollTop += targetRect.bottom - safeBottom;
+            }
+        }
+
+        const showCalculator = () => {
+            const rect = target ? target.getBoundingClientRect() : null;
+            const top = rect ? Math.max(0, Math.ceil(rect.bottom + 8)) : Math.round(window.innerHeight * 0.4);
+            modal.style.setProperty('--calc-sheet-top', `${top}px`);
+            modal.style.display = 'flex';
+            kpStr = target ? (target.value || '0') : '0';
+            checkCalcStatus();
+            updateAmtUI();
+        };
+        // 等待編輯視窗捲動完成後再定位，避免讀到舊的欄位座標。
+        requestAnimationFrame(showCalculator);
     }
 
     function closeCalcModal() {
@@ -2616,5 +2736,6 @@ ${deleteErr.message || deleteErr}`); return false; }
       }
     }
   </script>
+<script>updateTransitHandoffVisibility();</script>
 </body>
 </html>
