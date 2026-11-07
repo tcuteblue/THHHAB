@@ -119,8 +119,10 @@
 
     .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 3000; justify-content: center; align-items: center; backdrop-filter: blur(3px); }
     .modal-card { background: white; width: 90%; max-width: 400px; border-radius: 16px; padding: 25px; box-sizing: border-box; box-shadow: 0 10px 25px rgba(0,0,0,0.1); animation: popIn 0.3s ease-out; }
-    /* 編輯帳目視窗在手機上可自行捲動，避免計算機開啟時金額欄位被擠出可視範圍。 */
-    #editModal .modal-card { max-height: calc(100vh - 32px); max-height: calc(100dvh - 32px); overflow-y: auto; overscroll-behavior: contain; }
+    /* 編輯帳目平時維持畫面正中央；只有開啟計算機時才暫時上移。 */
+    #editModal .modal-card {
+      transition: transform 0.22s ease;
+    }
     .modal-title { font-size: 22px; font-weight: bold; margin-bottom: 15px; color: #333; text-align: center; }
     .modal-list { max-height: 250px; overflow-y: auto; margin-bottom: 15px; background: #fafafa; border-radius: 8px; padding: 5px; }
     .modal-list-item { display: flex; justify-content: space-between; align-items: center; padding: 12px; border-bottom: 1px solid #eee; font-size: 18px; }
@@ -143,10 +145,11 @@
     .record-action-icon { position: static; display: inline-block; transform: none; width: auto; text-align: center; font-size: 19px; line-height: 1; pointer-events: none; }
     .settings-modal-card { max-height: 85vh; overflow-y: auto; }
 
-    /* 計算機採底部面板呈現，面板頂端依金額欄位位置計算，不遮住正在輸入的欄位。 */
+    /* 計算機固定在畫面底部；開啟時由程式同步上移編輯視窗，確保金額欄露出。 */
     .calc-modal-overlay {
-      position: fixed; left: 0; right: 0; top: var(--calc-sheet-top, 0px); bottom: 0;
-      width: auto; height: auto; padding: 0; margin: 0;
+      position: fixed; left: 0; right: 0; top: auto; bottom: 0;
+      width: auto; height: min(52vh, 420px); min-height: 300px;
+      padding: 0; margin: 0;
       display: none; justify-content: center; align-items: stretch;
       background: transparent; backdrop-filter: none; -webkit-backdrop-filter: none;
       overflow: hidden; z-index: 4000;
@@ -174,6 +177,7 @@
     .key-act.is-calc { background: #007AFF; color: white; border-color: #007AFF; font-size: 28px; }
     #calcDisplay { background: linear-gradient(180deg, #FFFFFF 0%, #F6F8FA 100%); border: 1px solid #CAD3DD; box-shadow: inset 0 1px 3px rgba(40,55,75,0.08); padding: 9px 12px; text-align: right; font-size: clamp(24px, 4vh, 32px); font-weight: bold; border-radius: 8px; margin: 0; flex: 0 0 auto; min-height: 38px; word-break: break-all; color: #333; overflow-x: auto; white-space: nowrap; }
     @media (max-height: 620px) {
+      .calc-modal-overlay { height: min(58vh, 360px); min-height: 270px; }
       .calc-modal-overlay .calc-modal-card { padding-top: 8px; gap: 6px; }
       .calc-modal-card .modal-title { font-size: 18px; }
       .calc-grid-new { gap: 5px; min-height: 210px; flex-basis: 210px; grid-template-rows: repeat(5, minmax(30px, 1fr)); }
@@ -2263,9 +2267,17 @@ ${deleteErr.message || deleteErr}`); return false; }
       document.getElementById('editDetailInput').value = i.detail || '';
       document.getElementById('editAmountInput').value = i.amount == null ? '' : i.amount;
       populateCategorySelect(document.getElementById('editCategoryInput'), i.category || '');
-      document.getElementById('editModal').style.display = 'flex';
+      const editModal = document.getElementById('editModal');
+      const editCard = editModal.querySelector('.modal-card');
+      if (editCard) editCard.style.removeProperty('transform');
+      editModal.style.display = 'flex';
     }
-    function closeEditModal() { document.getElementById('editModal').style.display = 'none'; }
+    function closeEditModal() {
+      const editModal = document.getElementById('editModal');
+      const editCard = editModal.querySelector('.modal-card');
+      if (editCard) editCard.style.removeProperty('transform');
+      editModal.style.display = 'none';
+    }
     async function saveEditRecord() {
       const saveBtn = document.getElementById('saveEditBtn');
       const deleteBtn = document.getElementById('deleteEditBtn');
@@ -2406,35 +2418,51 @@ ${deleteErr.message || deleteErr}`); return false; }
         const target = document.getElementById(calcTargetInput);
         const editModal = document.getElementById('editModal');
         const editCard = editModal ? editModal.querySelector('.modal-card') : null;
+        let editCardShifted = false;
 
-        // 編輯視窗先把金額欄位捲到上方可視區，再計算計算機面板起點。
-        // 這樣計算機不會蓋住正在修改的金額欄位。
-        if (target && editModal && editModal.style.display === 'flex' && editCard) {
-            const cardRect = editCard.getBoundingClientRect();
+        // 只有從「編輯帳目」視窗開啟計算機時，才依計算機面板高度上移整個視窗。
+        // 一般新增帳目的計算機維持原本操作，不影響其他欄位或版面。
+        if (target && editModal && editCard && editModal.style.display === 'flex' && editModal.contains(target)) {
+            const viewportHeight = window.innerHeight || document.documentElement.clientHeight;
+            const shortScreen = viewportHeight <= 620;
+            const panelHeight = Math.max(
+                shortScreen ? 270 : 300,
+                Math.min(viewportHeight * (shortScreen ? 0.58 : 0.52), shortScreen ? 360 : 420)
+            );
+            const panelTop = viewportHeight - panelHeight;
             const targetRect = target.getBoundingClientRect();
-            const safeBottom = Math.min(window.innerHeight * 0.42, window.innerHeight - 260);
-            if (targetRect.bottom > safeBottom) {
-                editCard.scrollTop += targetRect.bottom - safeBottom;
+            const allowedBottom = panelTop - 8;
+            let shiftUp = Math.max(0, targetRect.bottom - allowedBottom);
+            // 不讓編輯視窗頂端被推到畫面外；正常版面下，金額欄可完整留在計算機上方。
+            shiftUp = Math.min(shiftUp, Math.max(0, targetRect.top - 8));
+            if (shiftUp > 0) {
+                editCard.style.transform = `translateY(-${Math.ceil(shiftUp)}px)`;
+                editCardShifted = true;
+            } else {
+                editCard.style.removeProperty('transform');
             }
         }
 
         const showCalculator = () => {
-            const rect = target ? target.getBoundingClientRect() : null;
-            const top = rect ? Math.max(0, Math.ceil(rect.bottom + 8)) : Math.round(window.innerHeight * 0.4);
-            modal.style.setProperty('--calc-sheet-top', `${top}px`);
             modal.style.display = 'flex';
             kpStr = target ? (target.value || '0') : '0';
             checkCalcStatus();
             updateAmtUI();
         };
-        // 等待編輯視窗捲動完成後再定位，避免讀到舊的欄位座標。
-        requestAnimationFrame(showCalculator);
+        // 先讓編輯視窗完成上移，再顯示底部計算機，避免面板動畫期間遮住金額欄。
+        if (editCardShifted) {
+            requestAnimationFrame(() => setTimeout(showCalculator, 230));
+        } else {
+            requestAnimationFrame(showCalculator);
+        }
     }
 
     function closeCalcModal() {
         const modal = document.getElementById('calcModal');
         modal.style.display = 'none';
-        modal.style.removeProperty('--calc-sheet-top');
+        const editModal = document.getElementById('editModal');
+        const editCard = editModal ? editModal.querySelector('.modal-card') : null;
+        if (editCard) editCard.style.removeProperty('transform');
     }
 
     function formatCalcDisplay(str) {
