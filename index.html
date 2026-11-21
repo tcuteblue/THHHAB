@@ -13,9 +13,8 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
   <script>
-    // 單檔 PWA：Manifest 以 Blob 動態產生，圖示以內嵌 SVG 提供。
-    // 注意：瀏覽器不允許以 blob: URL 註冊 Service Worker，因此本單檔版不註冊無效的 SW。
-    // 若日後要提供真正的離線快取，必須另外部署同源的 sw.js 檔案。
+    // 單檔 PWA：Manifest 以 Blob 動態產生，維持只部署 index.html 的方式。
+    // 不註冊外部 Service Worker；本機資料保存與網路恢復後補傳由頁面本身處理。
     let baseUrl = new URL('.', window.location.href).href;
     const startUrl = window.location.href.split('#')[0];
     const inlineIcon = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(
